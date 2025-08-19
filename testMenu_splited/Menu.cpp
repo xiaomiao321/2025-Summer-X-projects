@@ -58,32 +58,29 @@ void ui_run_easing(int16_t *current, int16_t target, uint8_t steps) {
 
 // 绘制主菜单
 void drawMenuIcons(int16_t offset) {
-    // 将Sprite完全填充为黑色，实现清屏效果
     menuSprite.fillSprite(TFT_BLACK);
-    
-    // 绘制三角形指示器
+
+    // 三角形指示器（Y 坐标调整）
     int16_t triangle_x = offset + (picture_flag * 48) + (icon_size / 2);
-    menuSprite.fillTriangle(triangle_x, 55, triangle_x - 10, 41, triangle_x + 10, 41, TFT_WHITE);
-    
-    // 绘制菜单项图像
+    menuSprite.fillTriangle(triangle_x, 58, triangle_x - 10, 44, triangle_x + 10, 44, TFT_WHITE);
+
+    // 图标（Y=20）
     for (int i = 0; i < MENU_ITEM_COUNT; i++) {
         int16_t x = offset + (i * 48);
         if (x >= -icon_size && x < 128) {
-            // 原屏幕Y坐标 16 -> Sprite内部Y坐标 11
-            menuSprite.pushImage(x, 11, 32, 32, menuItems[i].image);
+            menuSprite.pushImage(x, 20, 32, 32, menuItems[i].image);
         }
     }
 
-    // 绘制文字
+    // 文字（Y=8）
     menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
     menuSprite.setTextSize(1);
     menuSprite.setTextDatum(TL_DATUM);
-    // 原屏幕Y坐标 5 -> Sprite内部Y坐标 0
-    menuSprite.drawString("MENU:", 52, 0);
-    menuSprite.drawString(menuItems[picture_flag].name, 82, 0);
-    
-    // 将绘制完成的Sprite一次性推送到屏幕的(0, 5)位置
-    menuSprite.pushSprite(0, 5);
+    menuSprite.drawString("MENU:", 52, 8);
+    menuSprite.drawString(menuItems[picture_flag].name, 82, 8);
+
+    // ✅ 贴到屏幕 (0,0)
+    menuSprite.pushSprite(0, 0);
 }
 
 // 显示主菜单
@@ -94,43 +91,37 @@ void showMenuConfig() {
 
 // 动画过渡（进入或退出子菜单）
 void animateMenuTransition(const char *title, bool entering) {
-    current_state = ANIMATING; // 设置为动画状态
-    int16_t start_y = entering ? 5 : 74;   // 文本动画的起始Y坐标
-    int16_t target_y = entering ? 74 : 5;    // 文本动画的目标Y坐标
+    current_state = ANIMATING;
 
-    int16_t animated_text_y = start_y; // 用于驱动文本动画的局部变量
+    // ✅ 调整动画范围，适应 128 高度
+    int16_t start_y = entering ? 8 : 60;
+    int16_t target_y = entering ? 60 : 8;
+    int16_t animated_text_y = start_y;
 
     for (uint8_t step = ANIMATION_STEPS; step > 0; step--) {
-        // 1. 清理动画所需的屏幕区域
-        tft.fillRect(0, 5, 128, 80, TFT_BLACK);
+        // ✅ 清全屏
+        tft.fillRect(0, 0, 128, 128, TFT_BLACK);
 
-        // 2. 手动绘制图标和三角形，让它们在动画期间保持静止
-        //    (我们不调用drawMenuIcons，因为它用于绘制完整的静态主菜单)
-        
-        // 绘制图标
+        // 绘制图标（y=20）
         for (int i = 0; i < MENU_ITEM_COUNT; i++) {
             int16_t x = display + (i * 48);
             if (x >= -icon_size && x < 128) {
-                // 使用固定的Y坐标(16)来绘制图标
-                tft.pushImage(x, 16, 32, 32, menuItems[i].image);
+                tft.pushImage(x, 20, 32, 32, menuItems[i].image);
             }
         }
-        
-        // 绘制三角形
-        int16_t triangle_x = display + (picture_flag * 48) + (icon_size / 2);
-        // 使用固定的Y坐标(46, 60)来绘制三角形
-        tft.fillTriangle(triangle_x, 60, triangle_x - 10, 46, triangle_x + 10, 46, TFT_WHITE);
 
-        // 3. 在动画的Y坐标处绘制文本
+        // 三角形（y=44~58）
+        int16_t triangle_x = display + (picture_flag * 48) + 16;
+        tft.fillTriangle(triangle_x, 58, triangle_x - 10, 44, triangle_x + 10, 44, TFT_WHITE);
+
+        // 动画文字
         tft.drawString("MENU:", 52, animated_text_y);
         tft.drawString(title, 82, animated_text_y);
 
-        // 4. 更新下一个动画帧的Y坐标
         ui_run_easing(&animated_text_y, target_y, step);
         vTaskDelay(pdMS_TO_TICKS(15));
     }
 
-    // 设置最终状态
     current_state = entering ? SUB_MENU : MAIN_MENU;
 }
 

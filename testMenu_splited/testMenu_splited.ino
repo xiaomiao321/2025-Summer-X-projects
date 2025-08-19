@@ -13,7 +13,7 @@ void setup() {
     tft.init(); // 初始化TFT显示屏
     tft.setRotation(1); // 设置屏幕旋转方向
 
-    menuSprite.createSprite(128, 65);
+    menuSprite.createSprite(128, 128);
 
     tft.fillScreen(TFT_BLACK); // 清屏
     showMenuConfig(); // 显示主菜单
