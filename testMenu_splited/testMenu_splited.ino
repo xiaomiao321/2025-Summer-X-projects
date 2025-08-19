@@ -2,14 +2,12 @@
 #include <TFT_eSPI.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include "RotaryEncoder.h"
-#include "Weather.h"
-#include "performance.h"
 #include <WiFi.h>
-#include "img.h"
 #include "Menu.h"
-#include "Buzzer.h"
-#include "LED.H"
+
+// 全局变量
+TFT_eSPI tft = TFT_eSPI();         // TFT显示屏对象
+TFT_eSprite menuSprite = TFT_eSprite(&tft);
 void setup() {
     initRotaryEncoder(); // 初始化旋转编码器
     tft.init(); // 初始化TFT显示屏

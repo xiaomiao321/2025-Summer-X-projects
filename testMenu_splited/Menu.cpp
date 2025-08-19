@@ -1,7 +1,10 @@
-#include "Menu.h"
-// 全局变量
-TFT_eSPI tft = TFT_eSPI();         // TFT显示屏对象
-TFT_eSprite menuSprite = TFT_eSprite(&tft);
+#include "RotaryEncoder.h"
+#include <TFT_eSPI.h>
+#include "img.h"
+#include "LED.h"
+#include "Buzzer.h"
+#include "weather.h"
+#include "performance.h"
 int16_t display = 48;              // 图标初始x偏移
 uint8_t picture_flag = 0;          // 当前选中的菜单项索引
 const int icon_size = 32;          // 图标尺寸（32x32像素）
@@ -14,9 +17,11 @@ struct MenuItem {
 
 // 菜单项数组
 const MenuItem menuItems[] = {
-    {"Game", game},
+    {"Music", Music},
     {"Weather", Weather},
-    {"Performance", performance}
+    {"Performance", performance},
+    {"LED",LED},
+    {"Temperature",Temperature}
 };
 const uint8_t MENU_ITEM_COUNT = sizeof(menuItems) / sizeof(menuItems[0]); // 菜单项数量
 
@@ -34,7 +39,7 @@ static int16_t menu_display_trg = 74;          // 目标文字y坐标
 static const uint8_t ANIMATION_STEPS = 12;     // 动画步数
 static const uint8_t EASING_FACTOR = 8;        // 缓动因子
 
-// 缓动函数（二次缓出）
+// 缓动函数
 float easeOutQuad(float t) {
     return 1.0f - (1.0f - t) * (1.0f - t);
 }
@@ -53,15 +58,14 @@ void ui_run_easing(int16_t *current, int16_t target, uint8_t steps) {
 
 // 绘制主菜单
 void drawMenuIcons(int16_t offset) {
-    // 1. 将Sprite完全填充为黑色，实现清屏效果
+    // 将Sprite完全填充为黑色，实现清屏效果
     menuSprite.fillSprite(TFT_BLACK);
     
-    // 2. 绘制三角形指示器 (所有Y坐标都已转换为Sprite的内部坐标)
+    // 绘制三角形指示器
     int16_t triangle_x = offset + (picture_flag * 48) + (icon_size / 2);
-    // 原屏幕Y坐标 46, 60 -> Sprite内部Y坐标 41, 55
     menuSprite.fillTriangle(triangle_x, 55, triangle_x - 10, 41, triangle_x + 10, 41, TFT_WHITE);
     
-    // 3. 绘制菜单项图像
+    // 绘制菜单项图像
     for (int i = 0; i < MENU_ITEM_COUNT; i++) {
         int16_t x = offset + (i * 48);
         if (x >= -icon_size && x < 128) {
@@ -70,7 +74,7 @@ void drawMenuIcons(int16_t offset) {
         }
     }
 
-    // 4. 绘制文字
+    // 绘制文字
     menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
     menuSprite.setTextSize(1);
     menuSprite.setTextDatum(TL_DATUM);
@@ -78,7 +82,7 @@ void drawMenuIcons(int16_t offset) {
     menuSprite.drawString("MENU:", 52, 0);
     menuSprite.drawString(menuItems[picture_flag].name, 82, 0);
     
-    // 5. 将绘制完成的Sprite一次性推送到屏幕的(0, 5)位置
+    // 将绘制完成的Sprite一次性推送到屏幕的(0, 5)位置
     menuSprite.pushSprite(0, 5);
 }
 
@@ -131,36 +135,36 @@ void animateMenuTransition(const char *title, bool entering) {
 }
 
 
-// 显示子菜单（图像）
-void showSubMenu(const char *title, const uint16_t *image) {
-    animateMenuTransition(title, true);
+// // 显示子菜单图像(用于测试子菜单)
+// void showSubMenu(const char *title, const uint16_t *image) {
+//     animateMenuTransition(title, true);
     
-    tft.fillScreen(TFT_BLACK); // 清屏
-    // 居中显示32x32图像
-    tft.pushImage((tft.width() - 32) / 2, (tft.height() - 32) / 2, 32, 32, image);
+//     tft.fillScreen(TFT_BLACK); // 清屏
+//     // 居中显示32x32图像
+//     tft.pushImage((tft.width() - 32) / 2, (tft.height() - 32) / 2, 32, 32, image);
     
-    while (current_state == SUB_MENU) {
-        if (readButton()) { // 检测按钮按下
-            animateMenuTransition(title, false);
-            showMenuConfig();
-            break;
-        }
-        vTaskDelay(pdMS_TO_TICKS(15));
-    }
-}
+//     while (current_state == SUB_MENU) {
+//         if (readButton()) { // 检测按钮按下
+//             animateMenuTransition(title, false);
+//             showMenuConfig();
+//             break;
+//         }
+//         vTaskDelay(pdMS_TO_TICKS(15));
+//     }
+// }
 
-// 子菜单实现
-void test_gameMenu() {
-    showSubMenu("GAME", menuItems[0].image);
-}
+// // 子菜单实现
+// void test_gameMenu() {
+//     showSubMenu("GAME", menuItems[0].image);
+// }
 
-void test_weatherMenu() {
-    showSubMenu("WEATHER", menuItems[1].image);
-}
+// void test_weatherMenu() {
+//     showSubMenu("WEATHER", menuItems[1].image);
+// }
 
-void test_performanceMenu() {
-    showSubMenu("PERFORMANCE", menuItems[2].image);
-}
+// void test_performanceMenu() {
+//     showSubMenu("PERFORMANCE", menuItems[2].image);
+// }
 
 // 主菜单导航
 void showMenu() {
@@ -192,9 +196,11 @@ void showMenu() {
     
     if (readButton()) { // 检测按钮按下
         switch (picture_flag) {
-            case 0: test_gameMenu(); break;
-            case 1: test_weatherMenu(); break;
-            case 2: test_performanceMenu(); break;
+            case 0: BuzzerMenu(); break;
+            case 1: weatherMenu(); break;
+            case 2: performanceMenu(); break;
+            case 3: LEDMenu(); break;
+            case 4: DS18B20Menu(); break;
         }
     }
 }
