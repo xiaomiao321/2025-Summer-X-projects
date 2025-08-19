@@ -8,8 +8,6 @@
 // -----------------------------
 // 🔧 配置区
 // -----------------------------
-const char *WIFI_SSID = "xiaomiao_hotspot";
-const char *WIFI_PASSWORD = "xiaomiao123";
 const char *WEATHER_API_URL =
     "https://restapi.amap.com/v3/weather/"
     "weatherInfo?city=120104&key=8a4fcc66268926914fff0c968b3c804c";
@@ -137,7 +135,7 @@ void showWeatherError(const char* msg) {
 // -----------------------------
 void Weather_Init_Task(void *pvParameters) {
   drawWeatherStaticElements();
-  if (connectWiFi()) {
+  if (wifi_connected || connectWiFi()) {
     if (syncNTPTime()) {
       Serial.println("✅ Time synchronized");
       last_time_update = time(nullptr);

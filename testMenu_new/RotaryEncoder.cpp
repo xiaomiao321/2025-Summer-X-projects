@@ -6,7 +6,7 @@
 #define ENCODER_SW  7  // SW 引脚（按钮）
 
 // 配置选项：如果顺时针/逆时针方向相反，设置为 1
-#define SWAP_CLK_DT 1  // 0: 正常，1: 交换 CLK 和 DT 逻辑
+#define SWAP_CLK_DT 0  // 0: 正常，1: 交换 CLK 和 DT 逻辑
 
 // 全局变量
 static volatile int encoderPos = 0;  // 旋转计数
@@ -101,3 +101,5 @@ int readButton() {
 
   return pressed;
 }
+
+

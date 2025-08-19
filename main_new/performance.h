@@ -22,6 +22,13 @@
 
 #define BUFFER_SIZE 512
 
+// Chart layout
+#define CHART_X 3
+#define CHART_Y 80
+#define CHART_WIDTH 122
+#define CHART_HEIGHT 45
+#define MAX_DATA_POINTS 10
+
 // PC 数据结构体
 struct PCData {
   char cpuName[64];
@@ -35,6 +42,15 @@ struct PCData {
   bool valid;
 };
 
+// Data history for chart
+struct PerformanceHistory {
+  int cpuLoadHistory[MAX_DATA_POINTS];
+  int gpuLoadHistory[MAX_DATA_POINTS];
+  float ramLoadHistory[MAX_DATA_POINTS];
+  int currentIndex;
+  int count;
+};
+
 extern Adafruit_AHTX0 aht;
 extern float aht_temp;
 extern float aht_hum;
@@ -45,6 +61,7 @@ extern char inputBuffer[BUFFER_SIZE];
 extern uint16_t bufferIndex;
 extern bool stringComplete;
 extern SemaphoreHandle_t xPCDataMutex;
+extern struct PerformanceHistory perfHistory;
 
 void performanceMenu();
 

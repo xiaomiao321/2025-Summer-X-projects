@@ -1,7 +1,8 @@
 #include "Menu.h"
 #include "RotaryEncoder.h"
+#include <math.h>
 
-// 全局变量定义（在 Main.ino 中定义，这里仅声明）
+// 全局变量声明
 extern TFT_eSPI tft;
 extern int16_t display;
 extern uint8_t picture_flag;
@@ -11,231 +12,177 @@ extern const char *words[];
 extern const int speed_choose;
 extern const int icon_size;
 
+// 菜单状态枚举
+enum MenuState {
+    MAIN_MENU,
+    SUB_MENU,
+    ANIMATING
+};
+
+// 全局状态变量
+static MenuState current_state = MAIN_MENU;
+static int16_t menu_display = 10;
+static int16_t menu_display_trg = 74;
+static const uint8_t ANIMATION_STEPS = 10;
+static const uint8_t EASING_FACTOR = 8;
+
 // -----------------------------
-// 动画平滑移动函数
+// 缓动函数（使用简单的二次缓动）
 // -----------------------------
-void ui_run(int16_t *a, int16_t *a_trg, int b) {
-  if (*a < *a_trg) {
-    *a += b;
-    if (*a > *a_trg) *a = *a_trg;
-  }
-  if (*a > *a_trg) {
-    *a -= b;
-    if (*a < *a_trg) *a = *a_trg;
-  }
+float easeOutQuad(float t) {
+    return 1.0f - (1.0f - t) * (1.0f - t);
 }
 
 // -----------------------------
-// 向右移动图标
+// 动画平滑移动函数（改进版，添加缓动效果）
 // -----------------------------
-void ui_right_one_Picture(int16_t *a, int b) {
-  if (*a <= 48) {
-    *a += b;
-  } else {
-    *a = -144 + b;
-  }
+void ui_run_easing(int16_t *current, int16_t target, uint8_t steps) {
+    if (*current == target) return;
+    
+    float t = (float)(ANIMATION_STEPS - steps) / ANIMATION_STEPS;
+    float eased = easeOutQuad(t);
+    int16_t delta = target - *current;
+    *current += (int16_t)(delta * eased / steps);
+    
+    // 确保不超出目标值
+    if (abs(*current - target) < 2) {
+        *current = target;
+    }
 }
 
 // -----------------------------
-// 向左移动图标
+// 绘制主菜单图标
 // -----------------------------
-void ui_left_one_Picture(int16_t *a, int b) {
-  if (*a >= -144) {
-    *a -= b;
-  } else {
-    *a = 96 - b;
-  }
+void drawMenuIcons(int16_t offset, int16_t y_pos) {
+    tft.fillRect(0, 15, 128, 100, TFT_BLACK); // 清除图标区域
+    tft.fillTriangle(64, y_pos + 26, 84, y_pos + 16, 84, y_pos + 36, TFT_WHITE);
+    
+    // 绘制五个彩色图标
+    const uint16_t colors[] = {TFT_GREEN, TFT_BLUE, TFT_RED, TFT_YELLOW, TFT_CYAN};
+    for (int i = 0; i < 5; i++) {
+        tft.fillRect(offset + (i * 48), y_pos + 6, icon_size, icon_size, colors[i]);
+    }
 }
 
 // -----------------------------
-// 通用子菜单进入动画
+// 通用子菜单动画（进入/退出）
 // -----------------------------
-void toSubMenuDisplay(const char *title) {
-  int16_t menu_display = 10, menu_display_trg = 74;
-  while (menu_display != menu_display_trg) {
-    tft.fillRect(0, 5, 128, 100, TFT_BLACK); // 清除动画区域
-    tft.drawString("MENU:", 52, menu_display);
-    tft.fillTriangle(64, menu_display + 26, 84, menu_display + 16, 84, menu_display + 36, TFT_WHITE);
-    tft.fillRect(display, menu_display + 6, icon_size, icon_size, TFT_GREEN);
-    tft.fillRect(display + 48, menu_display + 6, icon_size, icon_size, TFT_BLUE);
-    tft.fillRect(display + 96, menu_display + 6, icon_size, icon_size, TFT_RED);
-    tft.fillRect(display + 144, menu_display + 6, icon_size, icon_size, TFT_YELLOW);
-    tft.fillRect(display + 192, menu_display + 6, icon_size, icon_size, TFT_CYAN);
-    ui_run(&menu_display, &menu_display_trg, 8);
-    delay(10);
-  }
-  menu_display = 74;
-  menu_display_trg = 10;
-  while (menu_display != menu_display_trg) {
-    tft.fillRect(0, 10, 128, 60, TFT_BLACK); // 清除动画区域
-    tft.drawString(title, 52, menu_display);
-    tft.drawLine(1, menu_display + 3, 128, menu_display + 3, TFT_WHITE);
-    ui_run(&menu_display, &menu_display_trg, 8);
-    delay(10);
-  }
-}
-
-// -----------------------------
-// 通用子菜单返回动画
-// -----------------------------
-void subToMenuDisplay(const char *title) {
-  int16_t menu_display = 10, menu_display_trg = 74;
-  while (menu_display != menu_display_trg) {
-    tft.fillRect(0, 10, 128, 60, TFT_BLACK); // 清除动画区域
-    tft.drawString(title, 52, menu_display);
-    tft.drawLine(1, menu_display + 3, 128, menu_display + 3, TFT_WHITE);
-    ui_run(&menu_display, &menu_display_trg, 8);
-    delay(10);
-  }
-  menu_display = 74;
-  menu_display_trg = 10;
-  while (menu_display != menu_display_trg) {
-    tft.fillRect(0, 5, 128, 100, TFT_BLACK); // 清除动画区域
-    tft.drawString("MENU:", 52, menu_display);
-    tft.fillTriangle(64, menu_display + 26, 84, menu_display + 16, 84, menu_display + 36, TFT_WHITE);
-    tft.fillRect(display, menu_display + 6, icon_size, icon_size, TFT_GREEN);
-    tft.fillRect(display + 48, menu_display + 6, icon_size, icon_size, TFT_BLUE);
-    tft.fillRect(display + 96, menu_display + 6, icon_size, icon_size, TFT_RED);
-    tft.fillRect(display + 144, menu_display + 6, icon_size, icon_size, TFT_YELLOW);
-    tft.fillRect(display + 192, menu_display + 6, icon_size, icon_size, TFT_CYAN);
-    ui_run(&menu_display, &menu_display_trg, 8);
-    delay(10);
-  }
+void animateMenuTransition(const char *title, bool entering) {
+    current_state = ANIMATING;
+    int16_t start = entering ? 10 : 74;
+    int16_t target = entering ? 74 : 10;
+    
+    for (uint8_t step = ANIMATION_STEPS; step > 0; step--) {
+        tft.fillRect(0, 5, 128, 100, TFT_BLACK); // 清除动画区域
+        
+        if (entering) {
+            tft.drawString("MENU:", 52, menu_display);
+            drawMenuIcons(display, menu_display);
+        } else {
+            tft.drawString(title, 52, menu_display);
+            tft.drawLine(1, menu_display + 3, 128, menu_display + 3, TFT_WHITE);
+        }
+        
+        ui_run_easing(&menu_display, target, step);
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    
+    menu_display = target;
+    current_state = entering ? SUB_MENU : MAIN_MENU;
 }
 
 // -----------------------------
 // 显示主菜单配置
 // -----------------------------
 void showMenuConfig() {
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(1);
-  tft.fillTriangle(64, 80, 84, 70, 84, 90, TFT_WHITE);
-  tft.fillRect(display, 20, icon_size, icon_size, TFT_GREEN);
-  tft.fillRect(display + 48, 20, icon_size, icon_size, TFT_BLUE);
-  tft.fillRect(display + 96, 20, icon_size, icon_size, TFT_RED);
-  tft.fillRect(display + 144, 20, icon_size, icon_size, TFT_YELLOW);
-  tft.fillRect(display + 192, 20, icon_size, icon_size, TFT_CYAN);
-  tft.drawString("MENU:", 52, 5);
-  tft.drawString(words[picture_flag], 82, 5);
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
+    
+    drawMenuIcons(display, 10);
+    tft.drawString("MENU:", 52, 5);
+    tft.drawString(words[picture_flag], 82, 5);
 }
 
 // -----------------------------
-// 游戏菜单
+// 通用子菜单显示
+// -----------------------------
+void showSubMenu(const char *title, const char *content) {
+    animateMenuTransition(title, true);
+    
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(1);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString(content, tft.width() / 2, tft.height() / 2);
+    
+    while (current_state == SUB_MENU) {
+        if (readButton()) {
+            animateMenuTransition(title, false);
+            display = 48;
+            picture_flag = 0;
+            showMenuConfig();
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+// -----------------------------
+// 子菜单实现
 // -----------------------------
 void gameMenu() {
-  toSubMenuDisplay("GAME");
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(1);
-  tft.setTextDatum(MC_DATUM);
-  tft.drawString("Game Menu", tft.width() / 2, tft.height() / 2);
-  while (1) {
-    if (readButton()) {
-      subToMenuDisplay("GAME");
-      break;
-    }
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
-  display = 48;
-  picture_flag = 0;
-  showMenuConfig();
+    showSubMenu("GAME", "Game Menu");
 }
 
-// -----------------------------
-// 消息菜单
-// -----------------------------
 void messageMenu() {
-  toSubMenuDisplay("MESSAGE");
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(1);
-  tft.setTextDatum(MC_DATUM);
-  tft.drawString("Message Menu", tft.width() / 2, tft.height() / 2);
-  while (1) {
-    if (readButton()) {
-      subToMenuDisplay("MESSAGE");
-      break;
-    }
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
-  display = 48;
-  picture_flag = 0;
-  showMenuConfig();
+    showSubMenu("MESSAGE", "Message Menu");
 }
 
-// -----------------------------
-// 设置菜单
-// -----------------------------
 void settingMenu() {
-  toSubMenuDisplay("SETTING");
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(1);
-  tft.setTextDatum(MC_DATUM);
-  tft.drawString("Setting Menu", tft.width() / 2, tft.height() / 2);
-  while (1) {
-    if (readButton()) {
-      subToMenuDisplay("SETTING");
-      break;
-    }
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
-  display = 48;
-  picture_flag = 0;
-  showMenuConfig();
+    showSubMenu("SETTING", "Setting Menu");
 }
 
 // -----------------------------
-// 显示主菜单并处理导航
+// 主菜单导航处理
 // -----------------------------
 void showMenu() {
-  int direction = readEncoder();
-  if (direction == 1 && display > -144) {
-    picture_flag = (picture_flag + 1) % 5;
-    circle_num = 48 / speed_choose;
-    while (circle_num) {
-      tft.fillRect(0, 5, 128, 100, TFT_BLACK);
-      ui_left_one_Picture(&display, speed_choose);
-      tft.fillTriangle(64, 80, 84, 70, 84, 90, TFT_WHITE);
-      tft.fillRect(display, 20, icon_size, icon_size, TFT_GREEN);
-      tft.fillRect(display + 48, 20, icon_size, icon_size, TFT_BLUE);
-      tft.fillRect(display + 96, 20, icon_size, icon_size, TFT_RED);
-      tft.fillRect(display + 144, 20, icon_size, icon_size, TFT_YELLOW);
-      tft.fillRect(display + 192, 20, icon_size, icon_size, TFT_CYAN);
-      tft.drawString("MENU:", 52, 5);
-      tft.drawString(words[picture_flag], 82, 5);
-      circle_num--;
-      delay(10);
+    if (current_state != MAIN_MENU) return;
+    
+    int direction = readEncoder();
+    
+    if (direction != 0) {
+        current_state = ANIMATING;
+        int16_t target_display = display;
+        
+        if (direction == 1 && display > -144) {
+            picture_flag = (picture_flag + 1) % 5;
+            target_display -= 48;
+        } else if (direction == -1 && display < 48) {
+            picture_flag = (picture_flag == 0) ? 4 : picture_flag - 1;
+            target_display += 48;
+        }
+        
+        for (uint8_t step = ANIMATION_STEPS; step > 0; step--) {
+            tft.fillRect(0, 5, 128, 100, TFT_BLACK);
+            ui_run_easing(&display, target_display, step);
+            drawMenuIcons(display, 10);
+            tft.drawString("MENU:", 52, 5);
+            tft.drawString(words[picture_flag], 82, 5);
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        
+        current_state = MAIN_MENU;
     }
-  } else if (direction == -1 && display < 48) {
-    picture_flag = (picture_flag == 0) ? 4 : picture_flag - 1;
-    circle_num = 48 / speed_choose;
-    while (circle_num) {
-      tft.fillRect(0, 5, 128, 100, TFT_BLACK);
-      ui_right_one_Picture(&display, speed_choose);
-      tft.fillTriangle(64, 80, 84, 70, 84, 90, TFT_WHITE);
-      tft.fillRect(display, 20, icon_size, icon_size, TFT_GREEN);
-      tft.fillRect(display + 48, 20, icon_size, icon_size, TFT_BLUE);
-      tft.fillRect(display + 96, 20, icon_size, icon_size, TFT_RED);
-      tft.fillRect(display + 144, 20, icon_size, icon_size, TFT_YELLOW);
-      tft.fillRect(display + 192, 20, icon_size, icon_size, TFT_CYAN);
-      tft.drawString("MENU:", 52, 5);
-      tft.drawString(words[picture_flag], 82, 5);
-      circle_num--;
-      delay(10);
+    
+    if (readButton()) {
+        switch (picture_flag) {
+            case 0: gameMenu(); break;
+            case 1: weatherMenu(); break; 
+            case 2: performanceMenu(); break;
+            case 3: messageMenu(); break;
+            case 4: settingMenu(); break;
+        }
     }
-  } else {
-    tft.fillRect(82, 5, 46, 10, TFT_BLACK);
-    tft.drawString(words[picture_flag], 82, 5);
-  }
-  if (readButton()) {
-    switch (picture_flag) {
-      case 0: gameMenu(); break;
-      case 1: weatherMenu(); break;
-      case 2: performanceMenu(); break;
-      case 3: messageMenu(); break;
-      case 4: settingMenu(); break;
-    }
-  }
 }

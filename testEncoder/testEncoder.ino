@@ -6,13 +6,13 @@
 #define ENCODER_SW  7  // SW 引脚（按钮）
 
 // 配置选项：如果顺时针/逆时针方向相反，设置为 1
-#define SWAP_CLK_DT 1  // 0: 正常，1: 交换 CLK 和 DT 逻辑
+#define SWAP_CLK_DT 0  // 0: 正常，1: 交换 CLK 和 DT 逻辑
 
 // 全局变量
 volatile int encoderPos = 0;  // 旋转计数
 static int buttonPressCount = 0;  // 按钮按下次数
 static unsigned long lastButtonTime = 0;  // 上次按钮按下的时间
-static const unsigned long debounceDelay = 100;  // 去抖动延时（毫秒）
+static const unsigned long debounceDelay = 300;  // 去抖动延时（毫秒）
 static int lastButtonState = HIGH;  // 上次按钮状态
 static uint8_t lastEncoded = 0;  // 上次编码状态
 static int deltaSum = 0;  // 累积状态变化增量

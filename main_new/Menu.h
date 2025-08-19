@@ -5,8 +5,12 @@
 #include <TFT_eSPI.h>
 #include "weather.h"
 #include "performance.h"
+#include "LED.h"
+#include "Buzzer.h"
+
 // 全局变量声明
 extern TFT_eSPI tft;
+extern SemaphoreHandle_t tftMutex;
 extern int16_t display;
 extern uint8_t picture_flag;
 extern int16_t display_trg;

@@ -15,6 +15,10 @@
 #define VALUE_COLOR TFT_CYAN
 #define ERROR_COLOR TFT_RED
 
+// WiFi 配置声明
+extern const char *WIFI_SSID;
+extern const char *WIFI_PASSWORD;
+
 extern struct tm timeinfo;
 extern String weather_main;
 extern String weather_temp;
@@ -25,5 +29,8 @@ extern unsigned long last_time_update;
 extern int last_sec;
 
 void weatherMenu();
+bool connectWiFi();
+void disconnectWiFi();
+void showWiFiStatus(bool connected);
 
 #endif
