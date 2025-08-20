@@ -1,7 +1,6 @@
 #ifndef LED_H
 #define LED_H
 
-#include "Menu.h"
 
 #define LED_PIN 3
 #define NUM_LEDS 10
@@ -9,5 +8,7 @@
 
 
 void LEDMenu();
+void LED_Init_Task(void *pvParameters);
+void LED_Task(void *pvParameters);
 
 #endif

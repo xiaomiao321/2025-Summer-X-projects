@@ -1,9 +1,9 @@
 #include "LED.h"
 #include <Adafruit_NeoPixel.h> 
-
+#include "Menu.h"
 bool stopLEDTask = false;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
-
+TaskHandle_t ledTaskHandle = NULL; // 用于跟踪 LED_Task
 
 void colorWipe(uint32_t color, int wait) {
   for (int i = 0; i < strip.numPixels(); i++) {
@@ -25,52 +25,48 @@ void rainbow(int wait) {
     vTaskDelay(pdMS_TO_TICKS(wait));
   }
 }
+
 // 更新屏幕显示函数
 void updateScreen(bool ledState) {
     tft.fillScreen(TFT_BLACK); // 清除屏幕
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextSize(2);
-    tft.setCursor(0, 50);
-    if (ledState) {
-        tft.println("LED: ON");
-    } else {
-        tft.println("LED: OFF");
-    }
+    tft.setCursor(10, 50); // 轻微调整位置以优化显示
+    tft.println(ledState ? "LED: ON" : "LED: OFF");
 }
+
 void LED_Init_Task(void *pvParameters) {
   strip.begin();
   strip.setBrightness(BRIGHTNESS);
+  strip.clear(); // 确保初始化时关闭所有 LED
   strip.show();
   Serial.println("WS2812 LED 初始化完成");
   vTaskDelete(NULL);
 }
 
 void LED_Task(void *pvParameters) {
+  bool *ledState = (bool *)pvParameters; // 接收 LED 状态指针
   for (;;) {
-    // 检查是否需要退出
-    if (stopLEDTask) {
+    if (stopLEDTask || !(*ledState)) { // 如果停止或 LED 关闭
       strip.clear();
-      strip.show(); // 关闭所有灯
-      Serial.println("LED_Task 安全退出");
-      break;
+      strip.show();
+      vTaskDelay(pdMS_TO_TICKS(100)); // 降低 CPU 占用
+      continue;
     }
 
+    // 仅在 ledState 为 true 时运行动画
     colorWipe(strip.Color(255, 0, 0), 50);
-    if (stopLEDTask) break;
+    if (stopLEDTask || !(*ledState)) continue;
 
     colorWipe(strip.Color(0, 255, 0), 50);
-    if (stopLEDTask) break;
+    if (stopLEDTask || !(*ledState)) continue;
 
     colorWipe(strip.Color(0, 0, 255), 50);
-    if (stopLEDTask) break;
+    if (stopLEDTask || !(*ledState)) continue;
 
     rainbow(20);
-    if (stopLEDTask) break;
-
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
-
-  vTaskDelete(NULL); // 自我删除
 }
 
 void LEDMenu() {
@@ -79,7 +75,7 @@ void LEDMenu() {
 
     animateMenuTransition("LED", true);
     xTaskCreatePinnedToCore(LED_Init_Task, "LED_Init", 4096, NULL, 2, NULL, 0);
-    xTaskCreatePinnedToCore(LED_Task, "LED_Show", 4096, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(LED_Task, "LED_Show", 4096, &ledState, 1, &ledTaskHandle, 0);
 
     initRotaryEncoder(); // 初始化旋转编码器
     updateScreen(ledState); // 初始屏幕更新
@@ -87,34 +83,26 @@ void LEDMenu() {
     while (true) {
         int encoderChange = readEncoder();
         if (encoderChange != 0) { // 检测到旋转
-            ledState = !ledState; // 切换LED状态
+            ledState = !ledState; // 切换 LED 状态
             updateScreen(ledState); // 更新屏幕显示
-            
-            // 根据新状态调整LED
-            if (ledState) {
-                colorWipe(strip.Color(255, 0, 0), 50); // 打开LED
-            } else {
-                strip.clear();
-                strip.show(); // 关闭所有LED
-            }
+            Serial.printf("LED State: %s\n", ledState ? "ON" : "OFF");
         }
 
-        if (readButton()) { // 如果检测到按钮按下，则退出
+        if (readButton()) { // 检测按钮按下，退出
             Serial.println("Exiting LED Menu...");
             stopLEDTask = true;
             
-            // 等待任务自我删除（最多等待1.5秒）
-            TaskHandle_t task = xTaskGetHandle("LED_Show");
-            for (int i = 0; i < 150 && task != NULL; i++) {
-                if (eTaskGetState(task) == eDeleted) break;
-                vTaskDelay(pdMS_TO_TICKS(10));
+            // 等待 LED_Task 退出
+            if (ledTaskHandle != NULL) {
+                for (int i = 0; i < 150; i++) {
+                    if (eTaskGetState(ledTaskHandle) == eDeleted) break;
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                }
             }
-            
-            TaskHandle_t initTask = xTaskGetHandle("LED_Init");
-            if(initTask != NULL) {
-                vTaskDelete(initTask);
-            }
-            
+
+            // 清理 LED
+            strip.clear();
+            strip.show();
             break;
         }
         
