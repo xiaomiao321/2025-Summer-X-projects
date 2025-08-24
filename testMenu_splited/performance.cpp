@@ -1,20 +1,17 @@
 #include "Performance.h"
-
+#include <TFT_eWidget.h>
+#include "Menu.h"
+#include "RotaryEncoder.h"
 // -----------------------------
 // 🔧 配置区
 // -----------------------------
-// const long SENSOR_INTERVAL_MS = 5000;
 
 // -----------------------------
 // 全局变量
 // -----------------------------
-// Adafruit_AHTX0 aht;
-// float aht_temp = 0.0f, aht_hum = 0.0f;
-// bool aht_ok = false;
 struct PCData {
   char cpuName[64];
   char gpuName[64];
-  char rpm[16];
   int cpuTemp;
   int cpuLoad;
   int gpuTemp;
@@ -25,7 +22,6 @@ struct PCData {
 float esp32c3_temp = 0.0f;
 struct PCData pcData = {.cpuName = "Unknown",
                         .gpuName = "Unknown",
-                        .rpm = "Unknown",
                         .cpuTemp = 0,
                         .cpuLoad = 0,
                         .gpuTemp = 0,
@@ -38,14 +34,19 @@ bool stringComplete = false;
 SemaphoreHandle_t xPCDataMutex = NULL;
 extern TFT_eSPI tft; // 声明外部 TFT 对象
 
+GraphWidget cpuGpuLoadChart = GraphWidget(&tft);
+TraceWidget cpuLoadTrace = TraceWidget(&cpuGpuLoadChart);
+TraceWidget gpuLoadTrace = TraceWidget(&cpuGpuLoadChart);
 
-// -----------------------------
-// 绘制静态元素（调整布局以适应折线图）
-// -----------------------------
+GraphWidget cpuGpuTempChart = GraphWidget(&tft);
+TraceWidget cpuTempTrace = TraceWidget(&cpuGpuTempChart);
+TraceWidget gpuTempTrace = TraceWidget(&cpuGpuTempChart);
+
+// 绘制静态元素
 void drawPerformanceStaticElements() {
   tft.fillScreen(BG_COLOR);
   tft.pushImage(LOGO_X, LOGO_Y_TOP, 40, 40, NVIDIAGEFORCE);
-  tft.pushImage(LOGO_X, LOGO_Y_BOTTOM - 16, 40, 40, intelcore); // Adjusted for chart space
+  tft.pushImage(LOGO_X, LOGO_Y_BOTTOM - 16, 40, 40, intelcore); 
   tft.setTextColor(TITLE_COLOR, BG_COLOR);
   tft.setTextSize(1);
   tft.setTextDatum(TL_DATUM);
@@ -54,11 +55,31 @@ void drawPerformanceStaticElements() {
   tft.drawString("GPU:", DATA_X, DATA_Y + 2 * LINE_HEIGHT);
   tft.drawString("RAM:", DATA_X, DATA_Y + 3 * LINE_HEIGHT);
   tft.drawString("ESP Temp:", DATA_X, DATA_Y + 4 * LINE_HEIGHT);
+
+  cpuGpuLoadChart.createGraph(100, 40, tft.color565(5, 5, 5));
+  cpuGpuLoadChart.setGraphScale(0.0, 100.0, 0.0, 100.0);
+  cpuGpuLoadChart.setGraphGrid(0.0, 50.0, 0.0, 50.0, TFT_DARKGREY);
+  cpuGpuLoadChart.drawGraph(80, 80);
+  tft.fillCircle(200, 90, 5, TFT_GREEN);
+  tft.fillCircle(200, 100, 5, TFT_BLUE);
+  tft.drawString("CPU", 190, 90);
+  tft.drawString("GPU", 190, 100);
+  cpuLoadTrace.startTrace(TFT_GREEN);
+  gpuLoadTrace.startTrace(TFT_BLUE);
+
+  cpuGpuTempChart.createGraph(100, 40, tft.color565(5, 5, 5));
+  cpuGpuTempChart.setGraphScale(0.0, 100.0, 0.0, 100.0);
+  cpuGpuTempChart.setGraphGrid(0.0, 50.0, 0.0, 50.0, TFT_DARKGREY);
+  cpuGpuTempChart.drawGraph(80, 130);
+  tft.fillCircle(200, 140, 5, TFT_RED);
+  tft.fillCircle(200, 150, 5, TFT_ORANGE);
+  tft.drawString("RAM", 190, 140);
+  tft.drawString("ESP32", 190, 150);
+  cpuTempTrace.startTrace(TFT_RED);
+  gpuTempTrace.startTrace(TFT_ORANGE);
 }
 
-// -----------------------------
-// 更新传感器和 PC 数据
-// -----------------------------
+// 更新 PC 数据
 void updatePerformanceData() {
   if (xSemaphoreTake(xPCDataMutex, 10) != pdTRUE)
     return;
@@ -70,6 +91,23 @@ void updatePerformanceData() {
     tft.drawString(String(pcData.gpuLoad) + "%", DATA_X + 40, DATA_Y + 2 * LINE_HEIGHT);
     tft.fillRect(DATA_X + 40, DATA_Y + 3 * LINE_HEIGHT, 80, LINE_HEIGHT, BG_COLOR);
     tft.drawString(String(pcData.ramLoad, 1) + "%", DATA_X + 40, DATA_Y + 3 * LINE_HEIGHT);
+
+    static float gx = 0.0;
+    cpuLoadTrace.addPoint(gx, pcData.cpuLoad);
+    gpuLoadTrace.addPoint(gx, pcData.gpuLoad);
+    cpuTempTrace.addPoint(gx, pcData.cpuTemp);
+    gpuTempTrace.addPoint(gx, pcData.gpuTemp);
+    gx += 1.0;
+    if (gx > 100.0) {
+      gx = 0.0;
+      cpuGpuLoadChart.drawGraph(14, 60);
+      cpuLoadTrace.startTrace(TFT_GREEN);
+      gpuLoadTrace.startTrace(TFT_BLUE);
+      cpuGpuTempChart.drawGraph(14, 110);
+      cpuTempTrace.startTrace(TFT_RED);
+      gpuTempTrace.startTrace(TFT_ORANGE);
+    }
+
   } else {
     tft.fillRect(DATA_X + 40, DATA_Y + LINE_HEIGHT, 80, 3 * LINE_HEIGHT, BG_COLOR);
     tft.setTextColor(ERROR_COLOR, BG_COLOR);
@@ -78,39 +116,19 @@ void updatePerformanceData() {
   tft.fillRect(DATA_X + 60, DATA_Y + 4 * LINE_HEIGHT, 60, LINE_HEIGHT, BG_COLOR);
   tft.setTextColor(VALUE_COLOR, BG_COLOR);
   tft.drawString(String(esp32c3_temp, 1) + "°C", DATA_X + 60, DATA_Y + 4 * LINE_HEIGHT);
-  // updatePerformanceHistory(); // Update history for chart
-  // drawPerformanceChart(); // Draw the chart
   xSemaphoreGive(xPCDataMutex);
 }
 
-// -----------------------------
-// 显示错误信息
-// -----------------------------
-void showPerformanceError(const char *msg) {
-  tft.fillScreen(BG_COLOR);
-  tft.setTextColor(ERROR_COLOR, BG_COLOR);
-  tft.setTextDatum(MC_DATUM);
-  tft.drawString("Error:", tft.width() / 2, tft.height() / 2 - LINE_HEIGHT);
-  tft.drawString(msg, tft.width() / 2, tft.height() / 2);
-  delay(2000);
-  drawPerformanceStaticElements();
-}
-
-// -----------------------------
 // 重置缓冲区
-// -----------------------------
 void resetBuffer() {
   bufferIndex = 0;
   inputBuffer[0] = '\0';
 }
 
-// -----------------------------
 // 解析 PC 数据
-// -----------------------------
 void parsePCData() {
   struct PCData newData = {.cpuName = "Unknown",
                            .gpuName = "Unknown",
-                           .rpm = "Unknown",
                            .cpuTemp = 0,
                            .cpuLoad = 0,
                            .gpuTemp = 0,
@@ -152,15 +170,6 @@ void parsePCData() {
       newData.ramLoad = atof(load);
     }
   }
-  ptr = strstr(inputBuffer, "GRPM");
-  if (ptr) {
-    ptr += 4;
-    char *end = strchr(ptr, '|');
-    if (end && end - ptr < sizeof(newData.rpm) - 1) {
-      strncpy(newData.rpm, ptr, end - ptr);
-      newData.rpm[end - ptr] = '\0';
-    }
-  }
   ptr = strstr(inputBuffer, "CPU:");
   if (ptr) {
     ptr += 4;
@@ -199,41 +208,10 @@ void parsePCData() {
 }
 
 // -----------------------------
-// AHT 传感器初始化任务
-// -----------------------------
-// void AHT_Init_Task(void *pvParameters) {
-//   Wire.begin(20, 21);
-//   Serial.println("Initializing AHT...");
-//   aht_ok = aht.begin();
-//   if (aht_ok)
-//     Serial.println("✅ AHT sensor found!");
-//   else
-//     Serial.println("❌ AHT sensor not found!");
-//   vTaskDelete(NULL);
-// }
-
-// // -----------------------------
-// // AHT 传感器读取任务
-// // -----------------------------
-// void AHT_Task(void *pvParameters) {
-//   for (;;) {
-//     if (aht_ok) {
-//       sensors_event_t hum, temp;
-//       if (aht.getEvent(&hum, &temp)) {
-//         aht_temp = temp.temperature;
-//         aht_hum = hum.relative_humidity;
-//       }
-//     }
-//     vTaskDelay(pdMS_TO_TICKS(SENSOR_INTERVAL_MS));
-//   }
-// }
-
-// -----------------------------
 // 性能监控初始化任务
 // -----------------------------
 void Performance_Init_Task(void *pvParameters) {
   drawPerformanceStaticElements();
-  //xTaskCreatePinnedToCore(AHT_Init_Task, "AHT_Init", 4096, NULL, 2, NULL, 0);
   vTaskDelete(NULL);
 }
 
@@ -241,25 +219,24 @@ void Performance_Init_Task(void *pvParameters) {
 // 性能监控显示任务
 // -----------------------------
 void Performance_Task(void *pvParameters) {
-  for (;;) {
+  for (;;)
+ {
     esp32c3_temp = temperatureRead();
     updatePerformanceData();
     vTaskDelay(pdMS_TO_TICKS(1000)); // Update every second for smoother chart updates
   }
 }
 
-// -----------------------------
 // 串口接收任务
-// -----------------------------
 void SERIAL_Task(void *pvParameters) {
-  for (;;) {
+  for (;;)
+ {
     if (Serial.available()) {
       char inChar = (char)Serial.read();
       if (bufferIndex < BUFFER_SIZE - 1) {
         inputBuffer[bufferIndex++] = inChar;
         inputBuffer[bufferIndex] = '\0';
       } else {
-        showPerformanceError("Buffer full!");
         resetBuffer();
       }
       if (inChar == '\n') {
@@ -282,13 +259,11 @@ void performanceMenu() {
   animateMenuTransition("PERFORMANCE",true);
   xPCDataMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(Performance_Init_Task, "Perf_Init", 8192, NULL, 2, NULL, 0);
-  // xTaskCreatePinnedToCore(AHT_Task, "AHT_Read", 4096, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(Performance_Task, "Perf_Show", 8192, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(SERIAL_Task, "Serial_Rx", 2048, NULL, 1, NULL, 0);
   while (1) {
     if (readButton()) {
       animateMenuTransition("PERFORMANCE",false);
-     // vTaskDelete(xTaskGetHandle("AHT_Read"));
       vTaskDelete(xTaskGetHandle("Perf_Show"));
       vTaskDelete(xTaskGetHandle("Serial_Rx"));
       vSemaphoreDelete(xPCDataMutex);

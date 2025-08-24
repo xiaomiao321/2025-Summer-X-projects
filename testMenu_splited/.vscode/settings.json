@@ -1,0 +1,21 @@
+{
+    "files.associations": {
+        "xiosbase": "cpp",
+        "mutex": "cpp",
+        "chrono": "cpp",
+        "deque": "cpp",
+        "format": "cpp",
+        "forward_list": "cpp",
+        "initializer_list": "cpp",
+        "list": "cpp",
+        "vector": "cpp",
+        "xhash": "cpp",
+        "xstring": "cpp",
+        "xtree": "cpp",
+        "xutility": "cpp",
+        "ios": "cpp",
+        "functional": "cpp",
+        "system_error": "cpp",
+        "xlocale": "cpp"
+    }
+}

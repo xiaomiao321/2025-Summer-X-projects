@@ -3,40 +3,81 @@
 #include <TFT_eSPI.h>
 #include <time.h>
 
+
 // 音阶频率（Hz）
+#define NOTE_REST 0
+#define NOTE_G3 196
+#define NOTE_A3 220
+#define NOTE_B3 247
 #define NOTE_C4 262
+#define NOTE_CS4 277
 #define NOTE_D4 294
+#define NOTE_DS4 311
 #define NOTE_E4 330
 #define NOTE_F4 349
+#define NOTE_FS4 370
 #define NOTE_G4 392
+#define NOTE_GS4 415
 #define NOTE_A4 440
+#define NOTE_AS4 466
 #define NOTE_B4 494
 #define NOTE_C5 523
+#define NOTE_CS5 554
+#define NOTE_D5 587
+#define NOTE_DS5 622
+#define NOTE_E5 659
+#define NOTE_F5 698
+#define NOTE_FS5 740
+#define NOTE_G5 784
+#define NOTE_GS5 831
+#define NOTE_A5 880
+#define NOTE_AS5 932
+#define NOTE_B5 988
+// 音阶频率（Hz）
+#define P0 	0	// 休止符频率
 
-// 歌曲数据结构
-typedef struct {
-  const char* name; // 歌曲名称
-  int* melody;      // 音符序列
-  int* durations;   // 节拍时长
-  int length;       // 音符数量
-} Song;
+#define L1 262  // 低音频率
+#define L2 294
+#define L3 330
+#define L4 349
+#define L5 392
+#define L6 440
+#define L7 494
 
-// 小星星
-int melody_twinkle[] = {
-  NOTE_C4, NOTE_C4, NOTE_G4, NOTE_G4, NOTE_A4, NOTE_A4, NOTE_G4,
-  NOTE_F4, NOTE_F4, NOTE_E4, NOTE_E4, NOTE_D4, NOTE_D4, NOTE_C4,
-  NOTE_G4, NOTE_G4, NOTE_F4, NOTE_F4, NOTE_E4, NOTE_E4, NOTE_D4,
-  NOTE_G4, NOTE_G4, NOTE_F4, NOTE_F4, NOTE_E4, NOTE_E4, NOTE_D4,
-  NOTE_C4, NOTE_C4, NOTE_G4, NOTE_G4, NOTE_A4, NOTE_A4, NOTE_G4,
-  NOTE_F4, NOTE_F4, NOTE_E4, NOTE_E4, NOTE_D4, NOTE_D4, NOTE_C4
+#define M1 523  // 中音频率
+#define M2 587
+#define M3 659
+#define M4 698
+#define M5 784
+#define M6 880
+#define M7 988
+
+#define H1 1047 // 高音频率
+#define H2 1175
+#define H3 1319
+#define H4 1397
+#define H5 1568
+#define H6 1760
+#define H7 1976
+
+
+#define DAHAI_TIME_OF_BEAT 714 // 大海节拍时间（ms）
+
+#define YUJIAN_TIME_OF_BEAT 652 // 大海节拍时间（ms）
+
+
+#define DOUBLE_CLICK_TIME 500 // 双击时间（ms）
+#define BUZZER_PIN 5
+
+// 大海
+int melody_da_hai[] = {
+  L5,L6,M1,M1,M1,M1,L6,L5,M1,M1,M2,M1,L6,M1,M2,M2,M2,M2,M1,L6,M2,M2,M3,M2,M3,M5,M6,M6,M5,M6,M5,M3,M2,M2,M3,M2,M1,L6,L5,L6,M1,M1,M1,M1,L6,M1,L5,L6,M1,M1,M1,M1,L6,L5,M1,M1,M2,M1,L6,M1,M2,M2,M2,M2,M1,L6,M2,M2,M3,M2,M3,M5,M6,M6,M5,M6,H1,M6,M5,M3,M2,M1,L6,L5,L6,M1,M1,M1,M1,M2,M1,M1,M3,M5
 };
-int durations_twinkle[] = {
-  500, 500, 500, 500, 500, 500, 1000,
-  500, 500, 500, 500, 500, 500, 1000,
-  500, 500, 500, 500, 500, 500, 1000,
-  500, 500, 500, 500, 500, 500, 1000,
-  500, 500, 500, 500, 500, 500, 1000,
-  500, 500, 500, 500, 500, 500, 1000
+int durations_da_hai[] = {
+  DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,
+  DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/4,DAHAI_TIME_OF_BEAT/4,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT*3,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,
+  
+  DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT/2,DAHAI_TIME_OF_BEAT*3,DAHAI_TIME_OF_BEAT/2,
 };
 
 // 生日快乐
@@ -53,18 +94,12 @@ int durations_happy_birthday[] = {
   250, 250, 500, 500, 500, 1000
 };
 
-// 欢乐颂
-int melody_ode_to_joy[] = {
-  NOTE_E4, NOTE_E4, NOTE_F4, NOTE_G4, NOTE_G4, NOTE_F4, NOTE_E4, NOTE_D4,
-  NOTE_C4, NOTE_C4, NOTE_D4, NOTE_E4, NOTE_E4, NOTE_D4, NOTE_D4,
-  NOTE_E4, NOTE_E4, NOTE_F4, NOTE_G4, NOTE_G4, NOTE_F4, NOTE_E4, NOTE_D4,
-  NOTE_C4, NOTE_C4, NOTE_D4, NOTE_E4, NOTE_D4, NOTE_C4, NOTE_C4
+// 遇见
+int melody_yu_jian[] = {
+    M5,M3,M3,M5,M2,M2,M3,M2,M2,M1,M1,M1,L7,L6,L7,M1,L7,M1,M1,M2,M3,M3,M5,M3,M3,M5,M2,M2,M3,M2,M2,M1,M1,M1,L7,L6,L7,M1,L7,L7,M1,M1,M2,M1
 };
-int durations_ode_to_joy[] = {
-  500, 500, 500, 500, 500, 500, 500, 500,
-  500, 500, 500, 500, 500, 500, 1000,
-  500, 500, 500, 500, 500, 500, 500, 500,
-  500, 500, 500, 500, 500, 500, 1000
+int durations_yu_jian[] = {
+YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT*2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT*3,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT*2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT/2,YUJIAN_TIME_OF_BEAT*2
 };
 
 // 两只老虎
@@ -107,11 +142,21 @@ int durations_jingle_bells[] = {
   500, 1000
 };
 
+// 歌曲数据结构
+typedef struct {
+  const char* name; // 歌曲名称
+  int* melody;      // 音符序列
+  int* durations;   // 节拍时长
+  int length;       // 音符数量
+} Song;
+
+
+
 // 歌曲列表
 Song songs[] = {
-  {"Twinkle Twinkle", melody_twinkle, durations_twinkle, sizeof(melody_twinkle) / sizeof(melody_twinkle[0])},
+  {"Da Hai", melody_da_hai, durations_da_hai, sizeof(melody_da_hai) / sizeof(melody_da_hai[0])},
   {"Happy Birthday", melody_happy_birthday, durations_happy_birthday, sizeof(melody_happy_birthday) / sizeof(melody_happy_birthday[0])},
-  {"Ode to Joy", melody_ode_to_joy, durations_ode_to_joy, sizeof(melody_ode_to_joy) / sizeof(melody_ode_to_joy[0])},
+  {"Yu Jian", melody_yu_jian, durations_yu_jian, sizeof(melody_yu_jian) / sizeof(melody_yu_jian[0])},
   {"Two Tigers", melody_two_tigers, durations_two_tigers, sizeof(melody_two_tigers) / sizeof(melody_two_tigers[0])},
   {"Mary Had a Lamb", melody_mary_lamb, durations_mary_lamb, sizeof(melody_mary_lamb) / sizeof(melody_mary_lamb[0])},
   {"Jingle Bells", melody_jingle_bells, durations_jingle_bells, sizeof(melody_jingle_bells) / sizeof(melody_jingle_bells[0])}

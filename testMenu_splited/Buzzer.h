@@ -3,8 +3,6 @@
 
 #include "Menu.h"
 
-#define BUZZER_PIN 5
-
 void BuzzerMenu();
 
 #endif

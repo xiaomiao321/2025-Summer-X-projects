@@ -5,6 +5,7 @@
 #include "Buzzer.h"
 #include "weather.h"
 #include "performance.h"
+#include "DS18B20.h"
 int16_t display = 48;              // 图标初始x偏移
 uint8_t picture_flag = 0;          // 当前选中的菜单项索引
 const int icon_size = 48;          // 图标尺寸（48x48像素）

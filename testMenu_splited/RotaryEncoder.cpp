@@ -12,7 +12,7 @@
 static volatile int encoderPos = 0;  // 旋转计数
 static int buttonPressCount = 0;     // 按钮按下次数
 static unsigned long lastButtonTime = 0;  // 上次按钮按下的时间
-static const unsigned long debounceDelay = 50;  // 去抖动延时（毫秒，降低以提高响应）
+static const unsigned long debounceDelay = 50;  // 去抖动延时
 static int lastButtonState = HIGH;   // 上次按钮状态
 static uint8_t lastEncoded = 0;      // 上次编码状态
 static int deltaSum = 0;             // 累积状态变化增量

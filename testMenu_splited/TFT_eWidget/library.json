@@ -1,0 +1,19 @@
+{
+  "name": "TFT_eWidget",
+  "version": "0.0.1",
+  "description": "A library for creating graphical widgets on a TFT screen.",
+  "keywords": "tft, widget, graphics, button, slider, graph",
+  "authors": [
+    {
+      "name": "Bodmer",
+      "url": "https://github.com/Bodmer"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Bodmer/TFT_eWidget.git"
+  },
+  "headers": "TFT_eWidget.h",
+  "frameworks": "arduino",
+  "platforms": "*"
+}
