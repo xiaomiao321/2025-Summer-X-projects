@@ -67,7 +67,6 @@
 
 
 #define DOUBLE_CLICK_TIME 500 // 双击时间（ms）
-#define BUZZER_PIN 5
 
 // 大海
 int melody_da_hai[] = {

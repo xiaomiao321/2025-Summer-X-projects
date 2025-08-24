@@ -23,7 +23,6 @@ static const unsigned long encoderDebounce = 2;  // 编码器去抖动时间（�
 void initRotaryEncoder() {
   // 初始化串口
   Serial.begin(115200);
-  while (!Serial);
 
   // 设置引脚模式
   pinMode(ENCODER_CLK, INPUT_PULLUP);

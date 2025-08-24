@@ -22,6 +22,9 @@
         "atomic": "cpp",
         "memory": "cpp",
         "map": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "type_traits": "cpp",
+        "cstdlib": "cpp",
+        "cmath": "cpp"
     }
 }

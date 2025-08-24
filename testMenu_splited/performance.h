@@ -22,10 +22,10 @@
 
 #define CHART_WIDTH    200
 #define CHART_HEIGHT   30
-#define CHART1_X       25
-#define CHART1_Y       145
-#define CHART2_X       25
-#define CHART2_Y       185
+#define CHART1_X       20
+#define CHART1_Y       140
+#define CHART2_X       20
+#define CHART2_Y       175
 
 #define VALUE_OFFSET_X 40
 #define VALUE_WIDTH    100
@@ -33,6 +33,18 @@
 #define LEGEND_TEXT_OFFSET 8
 #define LEGEND_SPACING 35
 #define LEGEND_ITEM_Y (DATA_Y + 4 * LINE_HEIGHT)
+
+// Arc display settings
+#define ARC_CPU_X 40
+#define ARC_CPU_Y 60
+#define ARC_GPU_X 120
+#define ARC_GPU_Y 60
+#define ARC_RADIUS_MAX 35
+#define ARC_RADIUS_MIN 15
+#define ARC_THICKNESS 8
+#define ARC_BG_COLOR TFT_DARKGREY
+#define ARC_CPU_COLOR TFT_GREEN
+#define ARC_GPU_COLOR TFT_BLUE
 
 // -----------------------------
 // 函数声明
