@@ -2,16 +2,7 @@
 #include "Menu.h"
 #include "RotaryEncoder.h"
 #include "Buzzer.h" // For BUZZER_PIN
-#include <Adafruit_NeoPixel.h>
-
-// --- NeoPixel Configuration ---
-// IMPORTANT: User must change these values to match their setup
-#define LED_PIN    3 // The GPIO pin connected to the NeoPixel strip2
-#define LED_COUNT  10 // The number of NeoPixels in the strip2
-// ------------------------------
-
-// Create NeoPixel object
-Adafruit_NeoPixel strip2(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+#include "LED.h" // Include LED.h to use the global strip object
 
 // Global flag to signal task to stop
 volatile bool stopAnimationTask = false;
@@ -41,8 +32,8 @@ void Animation_task(void *pvParameters)
     uint8_t r = (fg_color & 0xF800) >> 8;
     uint8_t g = (fg_color & 0x07E0) >> 3;
     uint8_t b = (fg_color & 0x001F) << 3;
-    strip2.fill(strip2.Color(r, g, b));
-    strip2.show();
+    strip.fill(strip.Color(r, g, b)); // Use the global strip object
+    strip.show();
 
     // 3. Play a sound effect using tone() with a duration
     tone(BUZZER_PIN, random(800, 1500), delay_ms);
@@ -57,8 +48,8 @@ void Animation_task(void *pvParameters)
 
   // Cleanup before exiting
   noTone(BUZZER_PIN);
-  strip2.clear();
-  strip2.show();
+  strip.clear();
+  strip.show();
   animationTaskHandle = NULL; // Clear the handle
   vTaskDelete(NULL); // Delete self
 }
@@ -68,9 +59,9 @@ void AnimationMenu()
   animateMenuTransition("Animation", true);
   tft.fillScreen(TFT_BLACK);
   
-  // Initialize NeoPixel strip2
-  strip2.begin();
-  strip2.show(); // Initialize all pixels to 'off'
+  // Initialize NeoPixel strip
+  strip.begin(); // Use the global strip object
+  strip.show(); // Initialize all pixels to 'off'
 
   stopAnimationTask = false; // Reset the flag
   

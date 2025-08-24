@@ -20,19 +20,20 @@
 #define LOGO_Y_BOTTOM  75
 #define BUFFER_SIZE    256
 
-#define CHART_WIDTH    200
-#define CHART_HEIGHT   30
-#define CHART1_X       20
-#define CHART1_Y       140
-#define CHART2_X       20
-#define CHART2_Y       175
+// Combined Chart Dimensions and Position
+#define COMBINED_CHART_WIDTH    200
+#define COMBINED_CHART_HEIGHT   80
+#define COMBINED_CHART_X        20
+#define COMBINED_CHART_Y        155
 
 #define VALUE_OFFSET_X 40
 #define VALUE_WIDTH    100
 #define LEGEND_RADIUS  5
 #define LEGEND_TEXT_OFFSET 8
-#define LEGEND_SPACING 35
-#define LEGEND_ITEM_Y (DATA_Y + 4 * LINE_HEIGHT)
+#define LEGEND_X_START 95 // Shifted to the right
+#define LEGEND_Y_POS 110
+#define LEGEND_SPACING_WIDE 80
+#define LEGEND_LINE_HEIGHT 15
 
 // Arc display settings
 #define ARC_CPU_X 40

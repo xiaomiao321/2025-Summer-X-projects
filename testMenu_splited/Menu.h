@@ -8,3 +8,5 @@ extern uint8_t picture_flag;          // 当前选中的菜单项索引
 void showMenu();
 void showMenuConfig();
 void animateMenuTransition(const char *title, bool entering);
+void ui_run_easing(int16_t *current, int16_t target, uint8_t steps);
+float easeOutQuad(float t);

@@ -46,8 +46,9 @@ void LED_Init_Task(void *pvParameters) {
 
 void LED_Task(void *pvParameters) {
   bool *ledState = (bool *)pvParameters; // 接收 LED 状态指针
-  for (;;) {
-    if (stopLEDTask || !(*ledState)) { // 如果停止或 LED 关闭
+  
+  while(!stopLEDTask) {
+    if (!(*ledState)) { // 如果 LED 关闭
       strip.clear();
       strip.show();
       vTaskDelay(pdMS_TO_TICKS(100)); // 降低 CPU 占用
@@ -56,17 +57,23 @@ void LED_Task(void *pvParameters) {
 
     // 仅在 ledState 为 true 时运行动画
     colorWipe(strip.Color(255, 0, 0), 50);
-    if (stopLEDTask || !(*ledState)) continue;
+    if (stopLEDTask) break;
 
     colorWipe(strip.Color(0, 255, 0), 50);
-    if (stopLEDTask || !(*ledState)) continue;
+    if (stopLEDTask) break;
 
     colorWipe(strip.Color(0, 0, 255), 50);
-    if (stopLEDTask || !(*ledState)) continue;
+    if (stopLEDTask) break;
 
     rainbow(20);
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
+
+  // 任务退出前的清理工作
+  strip.clear();
+  strip.show();
+  ledTaskHandle = NULL; // 清除任务句柄
+  vTaskDelete(NULL); // 删除任务自身
 }
 
 void LEDMenu() {

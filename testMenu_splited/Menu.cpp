@@ -7,19 +7,20 @@
 #include "performance.h"
 #include "DS18B20.h"
 #include "animation.h"
+#include "Games.h" 
 
 // --- Layout Configuration ---
 // Change these values to adjust the menu layout
-const int ICON_SIZE = 180;     // The size for the icons (e.g., 180x180)
-const int ICON_SPACING = 200;  // The horizontal space between icons (should be > ICON_SIZE)
-const int SCREEN_WIDTH = 240;
-const int SCREEN_HEIGHT = 240;
+static const int ICON_SIZE = 200;     // The size for the icons (e.g., 180x180)
+static const int ICON_SPACING = 220;  // The horizontal space between icons (should be > ICON_SIZE)
+static const int SCREEN_WIDTH = 240;
+static const int SCREEN_HEIGHT = 240;
 
 // Calculated layout values
-const int ICON_Y_POS = (SCREEN_HEIGHT / 2) - (ICON_SIZE / 2); // Center the icon vertically
-const int TRIANGLE_BASE_Y = ICON_Y_POS - 5;                   // Triangle base sits just above the icon
-const int TRIANGLE_PEAK_Y = TRIANGLE_BASE_Y - 20;             // Triangle peak is 20px higher
-const int INITIAL_X_OFFSET = (SCREEN_WIDTH / 2) - (ICON_SIZE / 2); // Center the first icon
+static const int ICON_Y_POS = (SCREEN_HEIGHT / 2) - (ICON_SIZE / 2); // Center the icon vertically
+static const int TRIANGLE_BASE_Y = ICON_Y_POS - 5;                   // Triangle base sits just above the icon
+static const int TRIANGLE_PEAK_Y = TRIANGLE_BASE_Y - 20;             // Triangle peak is 20px higher
+static const int INITIAL_X_OFFSET = (SCREEN_WIDTH / 2) - (ICON_SIZE / 2); // Center the first icon
 
 int16_t display = INITIAL_X_OFFSET; // Icon initial x-offset
 uint8_t picture_flag = 0;           // Current selected menu item index
@@ -34,10 +35,11 @@ struct MenuItem {
 const MenuItem menuItems[] = {
     {"Music", Music},
     {"Weather", Weather},
-    {"Performance", performance},
+    {"Performance", Performance},
     {"LED",LED},
     {"Temperature",Temperature},
-    {"Animation",performance}
+    {"Animation",Animation},
+    {"Games", Games} 
 };
 const uint8_t MENU_ITEM_COUNT = sizeof(menuItems) / sizeof(menuItems[0]); // Number of menu items
 
@@ -151,9 +153,6 @@ void showMenu() {
     
     int direction = readEncoder();
     if (direction != 0) {
-        // Play tick sound on scroll
-        tone(BUZZER_PIN, 1000*(picture_flag + 1), 20);
-
         current_state = ANIMATING;
         
         if (direction == 1) { // Right
@@ -161,7 +160,7 @@ void showMenu() {
         } else if (direction == -1) { // Left
             picture_flag = (picture_flag == 0) ? MENU_ITEM_COUNT - 1 : picture_flag - 1;
         }
-        
+        tone(BUZZER_PIN, 1000*(picture_flag + 1), 20);
         int16_t target_display = INITIAL_X_OFFSET - (picture_flag * ICON_SPACING);
         
         for (uint8_t step = ANIMATION_STEPS; step > 0; step--) {
@@ -187,6 +186,7 @@ void showMenu() {
             case 3: LEDMenu(); break;
             case 4: DS18B20Menu(); break;
             case 5: AnimationMenu();break;
+            case 6: GamesMenu(); break; // New case
         }
     }
 }

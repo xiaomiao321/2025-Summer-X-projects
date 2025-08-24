@@ -34,15 +34,13 @@ bool stringComplete = false;
 SemaphoreHandle_t xPCDataMutex = NULL;
 extern TFT_eSPI tft; // 声明外部 TFT 对象
 
-GraphWidget cpuGpuLoadChart = GraphWidget(&tft);
-TraceWidget cpuLoadTrace = TraceWidget(&cpuGpuLoadChart);
-TraceWidget gpuLoadTrace = TraceWidget(&cpuGpuLoadChart);
+// Combined chart for all four traces
+GraphWidget combinedChart = GraphWidget(&tft);
+TraceWidget cpuLoadTrace = TraceWidget(&combinedChart);
+TraceWidget gpuLoadTrace = TraceWidget(&combinedChart);
+TraceWidget cpuTempTrace = TraceWidget(&combinedChart);
+TraceWidget gpuTempTrace = TraceWidget(&combinedChart);
 
-GraphWidget cpuGpuTempChart = GraphWidget(&tft);
-TraceWidget cpuTempTrace = TraceWidget(&cpuGpuTempChart);
-TraceWidget gpuTempTrace = TraceWidget(&cpuGpuTempChart);
-
-// 绘制静态元素
 // 绘制静态元素
 void drawPerformanceStaticElements() {
   tft.fillScreen(BG_COLOR);
@@ -59,55 +57,43 @@ void drawPerformanceStaticElements() {
   tft.setTextColor(TFT_ORANGE, BG_COLOR);
   tft.drawString("ESP:", DATA_X, DATA_Y + 3 * LINE_HEIGHT);
 
-  cpuGpuLoadChart.createGraph(CHART_WIDTH, CHART_HEIGHT, tft.color565(5, 5, 5));
-  cpuGpuLoadChart.setGraphScale(0.0, 100.0, 0.0, 100.0);
-  cpuGpuLoadChart.setGraphGrid(0.0, 25.0, 0.0, 25.0, TFT_DARKGREY);
-  cpuGpuLoadChart.drawGraph(CHART1_X, CHART1_Y);
+  // Combined Chart Setup
+  combinedChart.createGraph(COMBINED_CHART_WIDTH, COMBINED_CHART_HEIGHT, tft.color565(5, 5, 5));
+  combinedChart.setGraphScale(0.0, 100.0, 0.0, 100.0); // X and Y scale from 0 to 100
+  combinedChart.setGraphGrid(0.0, 25.0, 0.0, 25.0, TFT_DARKGREY);
+  combinedChart.drawGraph(COMBINED_CHART_X, COMBINED_CHART_Y);
   
-  // Legend for chart 1 (top right of chart)
+  // Legend for combined chart
   tft.setTextSize(1); // Smaller text for legend
-  tft.fillCircle(DATA_X, LEGEND_ITEM_Y, LEGEND_RADIUS, TFT_GREEN);
+  
+  // CPU Load Legend
+  tft.fillCircle(LEGEND_X_START, LEGEND_Y_POS, LEGEND_RADIUS, TFT_GREEN);
   tft.setTextColor(TFT_GREEN, BG_COLOR);
-  tft.drawString("CPU", DATA_X + LEGEND_TEXT_OFFSET, LEGEND_ITEM_Y);
-  tft.fillCircle(DATA_X + LEGEND_SPACING, LEGEND_ITEM_Y, LEGEND_RADIUS, TFT_BLUE);
+  tft.drawString("CPU Load", LEGEND_X_START + LEGEND_TEXT_OFFSET, LEGEND_Y_POS);
+  
+  // GPU Load Legend
+  tft.fillCircle(LEGEND_X_START + LEGEND_SPACING_WIDE, LEGEND_Y_POS, LEGEND_RADIUS, TFT_BLUE);
   tft.setTextColor(TFT_BLUE, BG_COLOR);
-  tft.drawString("GPU", DATA_X + LEGEND_SPACING + LEGEND_TEXT_OFFSET, LEGEND_ITEM_Y);
+  tft.drawString("GPU Load", LEGEND_X_START + LEGEND_SPACING_WIDE + LEGEND_TEXT_OFFSET, LEGEND_Y_POS);
 
-  // Axis values for chart 1
+  // CPU Temp Legend
+  tft.fillCircle(LEGEND_X_START, LEGEND_Y_POS + LEGEND_LINE_HEIGHT, LEGEND_RADIUS, TFT_RED);
+  tft.setTextColor(TFT_RED, BG_COLOR);
+  tft.drawString("RAM", LEGEND_X_START + LEGEND_TEXT_OFFSET, LEGEND_Y_POS + LEGEND_LINE_HEIGHT);
+
+  // GPU Temp Legend
+  tft.fillCircle(LEGEND_X_START + LEGEND_SPACING_WIDE, LEGEND_Y_POS + LEGEND_LINE_HEIGHT, LEGEND_RADIUS, TFT_ORANGE);
+  tft.setTextColor(TFT_ORANGE, BG_COLOR);
+  tft.drawString("GPU Temp", LEGEND_X_START + LEGEND_SPACING_WIDE + LEGEND_TEXT_OFFSET, LEGEND_Y_POS + LEGEND_LINE_HEIGHT);
+
+  // Axis values for combined chart
   tft.setTextColor(TITLE_COLOR, BG_COLOR); // Axis value color
-  // tft.drawString("0", cpuGpuLoadChart.getPointX(0), CHART1_Y + CHART_HEIGHT + 5);
-  // tft.drawString("50", cpuGpuLoadChart.getPointX(50), CHART1_Y + CHART_HEIGHT + 5);
-  // tft.drawString("100", cpuGpuLoadChart.getPointX(100), CHART1_Y + CHART_HEIGHT + 5);
-  tft.drawString("0", CHART1_X - 15, cpuGpuLoadChart.getPointY(0));
-  tft.drawString("50", CHART1_X - 15, cpuGpuLoadChart.getPointY(50));
-  tft.drawString("100", CHART1_X - 15, cpuGpuLoadChart.getPointY(100));
+  tft.drawString("0", COMBINED_CHART_X - 15, combinedChart.getPointY(0));
+  tft.drawString("50", COMBINED_CHART_X - 15, combinedChart.getPointY(50));
+  tft.drawString("100", COMBINED_CHART_X - 15, combinedChart.getPointY(100));
 
   cpuLoadTrace.startTrace(TFT_GREEN);
   gpuLoadTrace.startTrace(TFT_BLUE);
-
-  cpuGpuTempChart.createGraph(CHART_WIDTH, CHART_HEIGHT, tft.color565(5, 5, 5));
-  cpuGpuTempChart.setGraphScale(0.0, 100.0, 0.0, 100.0);
-  cpuGpuTempChart.setGraphGrid(0.0, 25.0, 0.0, 25.0, TFT_DARKGREY);
-  cpuGpuTempChart.drawGraph(CHART2_X, CHART2_Y);
-
-  // Legend for chart 2 (top right of chart)
-  tft.setTextSize(1); // Smaller text for legend
-  tft.fillCircle(DATA_X, LEGEND_ITEM_Y + LINE_HEIGHT, LEGEND_RADIUS, TFT_RED);
-  tft.setTextColor(TFT_RED, BG_COLOR);
-  tft.drawString("RAM", DATA_X + LEGEND_TEXT_OFFSET, LEGEND_ITEM_Y + LINE_HEIGHT);
-  tft.fillCircle(DATA_X + LEGEND_SPACING, LEGEND_ITEM_Y + LINE_HEIGHT, LEGEND_RADIUS, TFT_ORANGE);
-  tft.setTextColor(TFT_ORANGE, BG_COLOR);
-  tft.drawString("ESP", DATA_X + LEGEND_SPACING + LEGEND_TEXT_OFFSET, LEGEND_ITEM_Y + LINE_HEIGHT);
-
-  // Axis values for chart 2
-  tft.setTextColor(TITLE_COLOR, BG_COLOR); // Axis value color
-  tft.drawString("0", cpuGpuTempChart.getPointX(0), CHART2_Y + CHART_HEIGHT + 5);
-  tft.drawString("50", cpuGpuTempChart.getPointX(50), CHART2_Y + CHART_HEIGHT + 5);
-  tft.drawString("100", cpuGpuTempChart.getPointX(100), CHART2_Y + CHART_HEIGHT + 5);
-  tft.drawString("0", CHART2_X - 15, cpuGpuTempChart.getPointY(0));
-  tft.drawString("50", CHART2_X - 15, cpuGpuTempChart.getPointY(50));
-  tft.drawString("100", CHART2_X - 15, cpuGpuTempChart.getPointY(100));
-
   cpuTempTrace.startTrace(TFT_RED);
   gpuTempTrace.startTrace(TFT_ORANGE);
 }
@@ -137,15 +123,14 @@ void updatePerformanceData() {
     static float gx = 0.0;
     cpuLoadTrace.addPoint(gx, pcData.cpuLoad);
     gpuLoadTrace.addPoint(gx, pcData.gpuLoad);
-    cpuTempTrace.addPoint(gx, pcData.cpuTemp);
+    cpuTempTrace.addPoint(gx, pcData.ramLoad);
     gpuTempTrace.addPoint(gx, pcData.gpuTemp);
     gx += 1.0;
     if (gx > 100.0) {
       gx = 0.0;
-      cpuGpuLoadChart.drawGraph(CHART1_X, CHART1_Y);
+      combinedChart.drawGraph(COMBINED_CHART_X, COMBINED_CHART_Y);
       cpuLoadTrace.startTrace(TFT_GREEN);
       gpuLoadTrace.startTrace(TFT_BLUE);
-      cpuGpuTempChart.drawGraph(CHART2_X, CHART2_Y);
       cpuTempTrace.startTrace(TFT_RED);
       gpuTempTrace.startTrace(TFT_ORANGE);
     }
@@ -270,7 +255,7 @@ void Performance_Task(void *pvParameters) {
  {
     esp32c3_temp = temperatureRead();
     updatePerformanceData();
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Update every second for smoother chart updates
+    vTaskDelay(pdMS_TO_TICKS(500)); // Update every second for smoother chart updates
   }
 }
 
