@@ -43,38 +43,71 @@ TraceWidget cpuTempTrace = TraceWidget(&cpuGpuTempChart);
 TraceWidget gpuTempTrace = TraceWidget(&cpuGpuTempChart);
 
 // 绘制静态元素
+// 绘制静态元素
 void drawPerformanceStaticElements() {
   tft.fillScreen(BG_COLOR);
-  tft.pushImage(LOGO_X, LOGO_Y_TOP, 40, 40, NVIDIAGEFORCE);
-  tft.pushImage(LOGO_X, LOGO_Y_BOTTOM - 16, 40, 40, intelcore); 
-  tft.setTextColor(TITLE_COLOR, BG_COLOR);
-  tft.setTextSize(1);
+  tft.pushImage(LOGO_X, LOGO_Y_TOP, NVIDIA_HEIGHT, NVIDIA_WIDTH, NVIDIA);
+  tft.pushImage(LOGO_X, LOGO_Y_BOTTOM, INTEL_HEIGHT, INTEL_WIDTH, intel); 
+  tft.setTextSize(2); 
   tft.setTextDatum(TL_DATUM);
-  tft.drawString("Performance", DATA_X, DATA_Y);
-  tft.drawString("CPU:", DATA_X, DATA_Y + LINE_HEIGHT);
-  tft.drawString("GPU:", DATA_X, DATA_Y + 2 * LINE_HEIGHT);
-  tft.drawString("RAM:", DATA_X, DATA_Y + 3 * LINE_HEIGHT);
-  tft.drawString("ESP Temp:", DATA_X, DATA_Y + 4 * LINE_HEIGHT);
+  tft.setTextColor(TFT_GREEN, BG_COLOR);
+  tft.drawString("CPU:", DATA_X, DATA_Y);
+  tft.setTextColor(TFT_BLUE, BG_COLOR);
+  tft.drawString("GPU:", DATA_X, DATA_Y + LINE_HEIGHT);
+  tft.setTextColor(TFT_RED, BG_COLOR);
+  tft.drawString("RAM:", DATA_X, DATA_Y + 2 * LINE_HEIGHT);
+  tft.setTextColor(TFT_ORANGE, BG_COLOR);
+  tft.drawString("ESP:", DATA_X, DATA_Y + 3 * LINE_HEIGHT);
 
-  cpuGpuLoadChart.createGraph(100, 40, tft.color565(5, 5, 5));
+  cpuGpuLoadChart.createGraph(CHART_WIDTH, CHART_HEIGHT, tft.color565(5, 5, 5));
   cpuGpuLoadChart.setGraphScale(0.0, 100.0, 0.0, 100.0);
-  cpuGpuLoadChart.setGraphGrid(0.0, 50.0, 0.0, 50.0, TFT_DARKGREY);
-  cpuGpuLoadChart.drawGraph(80, 80);
-  tft.fillCircle(200, 90, 5, TFT_GREEN);
-  tft.fillCircle(200, 100, 5, TFT_BLUE);
-  tft.drawString("CPU", 190, 90);
-  tft.drawString("GPU", 190, 100);
+  cpuGpuLoadChart.setGraphGrid(0.0, 25.0, 0.0, 25.0, TFT_DARKGREY);
+  cpuGpuLoadChart.drawGraph(CHART1_X, CHART1_Y);
+  
+  // Legend for chart 1 (top right of chart)
+  tft.setTextSize(1); // Smaller text for legend
+  tft.fillCircle(DATA_X, LEGEND_ITEM_Y, LEGEND_RADIUS, TFT_GREEN);
+  tft.setTextColor(TFT_GREEN, BG_COLOR);
+  tft.drawString("CPU", DATA_X + LEGEND_TEXT_OFFSET, LEGEND_ITEM_Y);
+  tft.fillCircle(DATA_X + LEGEND_SPACING, LEGEND_ITEM_Y, LEGEND_RADIUS, TFT_BLUE);
+  tft.setTextColor(TFT_BLUE, BG_COLOR);
+  tft.drawString("GPU", DATA_X + LEGEND_SPACING + LEGEND_TEXT_OFFSET, LEGEND_ITEM_Y);
+
+  // Axis values for chart 1
+  tft.setTextColor(TITLE_COLOR, BG_COLOR); // Axis value color
+  // tft.drawString("0", cpuGpuLoadChart.getPointX(0), CHART1_Y + CHART_HEIGHT + 5);
+  // tft.drawString("50", cpuGpuLoadChart.getPointX(50), CHART1_Y + CHART_HEIGHT + 5);
+  // tft.drawString("100", cpuGpuLoadChart.getPointX(100), CHART1_Y + CHART_HEIGHT + 5);
+  tft.drawString("0", CHART1_X - 15, cpuGpuLoadChart.getPointY(0));
+  tft.drawString("50", CHART1_X - 15, cpuGpuLoadChart.getPointY(50));
+  tft.drawString("100", CHART1_X - 15, cpuGpuLoadChart.getPointY(100));
+
   cpuLoadTrace.startTrace(TFT_GREEN);
   gpuLoadTrace.startTrace(TFT_BLUE);
 
-  cpuGpuTempChart.createGraph(100, 40, tft.color565(5, 5, 5));
+  cpuGpuTempChart.createGraph(CHART_WIDTH, CHART_HEIGHT, tft.color565(5, 5, 5));
   cpuGpuTempChart.setGraphScale(0.0, 100.0, 0.0, 100.0);
-  cpuGpuTempChart.setGraphGrid(0.0, 50.0, 0.0, 50.0, TFT_DARKGREY);
-  cpuGpuTempChart.drawGraph(80, 130);
-  tft.fillCircle(200, 140, 5, TFT_RED);
-  tft.fillCircle(200, 150, 5, TFT_ORANGE);
-  tft.drawString("RAM", 190, 140);
-  tft.drawString("ESP32", 190, 150);
+  cpuGpuTempChart.setGraphGrid(0.0, 25.0, 0.0, 25.0, TFT_DARKGREY);
+  cpuGpuTempChart.drawGraph(CHART2_X, CHART2_Y);
+
+  // Legend for chart 2 (top right of chart)
+  tft.setTextSize(1); // Smaller text for legend
+  tft.fillCircle(DATA_X, LEGEND_ITEM_Y + LINE_HEIGHT, LEGEND_RADIUS, TFT_RED);
+  tft.setTextColor(TFT_RED, BG_COLOR);
+  tft.drawString("RAM", DATA_X + LEGEND_TEXT_OFFSET, LEGEND_ITEM_Y + LINE_HEIGHT);
+  tft.fillCircle(DATA_X + LEGEND_SPACING, LEGEND_ITEM_Y + LINE_HEIGHT, LEGEND_RADIUS, TFT_ORANGE);
+  tft.setTextColor(TFT_ORANGE, BG_COLOR);
+  tft.drawString("ESP", DATA_X + LEGEND_SPACING + LEGEND_TEXT_OFFSET, LEGEND_ITEM_Y + LINE_HEIGHT);
+
+  // Axis values for chart 2
+  tft.setTextColor(TITLE_COLOR, BG_COLOR); // Axis value color
+  tft.drawString("0", cpuGpuTempChart.getPointX(0), CHART2_Y + CHART_HEIGHT + 5);
+  tft.drawString("50", cpuGpuTempChart.getPointX(50), CHART2_Y + CHART_HEIGHT + 5);
+  tft.drawString("100", cpuGpuTempChart.getPointX(100), CHART2_Y + CHART_HEIGHT + 5);
+  tft.drawString("0", CHART2_X - 15, cpuGpuTempChart.getPointY(0));
+  tft.drawString("50", CHART2_X - 15, cpuGpuTempChart.getPointY(50));
+  tft.drawString("100", CHART2_X - 15, cpuGpuTempChart.getPointY(100));
+
   cpuTempTrace.startTrace(TFT_RED);
   gpuTempTrace.startTrace(TFT_ORANGE);
 }
@@ -84,13 +117,22 @@ void updatePerformanceData() {
   if (xSemaphoreTake(xPCDataMutex, 10) != pdTRUE)
     return;
   tft.setTextColor(VALUE_COLOR, BG_COLOR);
+  tft.setTextSize(2);
   if (pcData.valid) {
-    tft.fillRect(DATA_X + 40, DATA_Y + LINE_HEIGHT, 80, LINE_HEIGHT, BG_COLOR);
-    tft.drawString(String(pcData.cpuLoad) + "%", DATA_X + 40, DATA_Y + LINE_HEIGHT);
-    tft.fillRect(DATA_X + 40, DATA_Y + 2 * LINE_HEIGHT, 80, LINE_HEIGHT, BG_COLOR);
-    tft.drawString(String(pcData.gpuLoad) + "%", DATA_X + 40, DATA_Y + 2 * LINE_HEIGHT);
-    tft.fillRect(DATA_X + 40, DATA_Y + 3 * LINE_HEIGHT, 80, LINE_HEIGHT, BG_COLOR);
-    tft.drawString(String(pcData.ramLoad, 1) + "%", DATA_X + 40, DATA_Y + 3 * LINE_HEIGHT);
+    // CPU Data
+    tft.fillRect(DATA_X + VALUE_OFFSET_X, DATA_Y, VALUE_WIDTH, LINE_HEIGHT, BG_COLOR);
+    tft.setTextColor(TFT_GREEN, BG_COLOR);
+    tft.drawString(String(pcData.cpuLoad) + "% " + String(pcData.cpuTemp) + "C", DATA_X + VALUE_OFFSET_X, DATA_Y);
+    
+    // GPU Data
+    tft.fillRect(DATA_X + VALUE_OFFSET_X, DATA_Y + LINE_HEIGHT, VALUE_WIDTH, LINE_HEIGHT, BG_COLOR);
+    tft.setTextColor(TFT_BLUE, BG_COLOR);
+    tft.drawString(String(pcData.gpuLoad) + "% " + String(pcData.gpuTemp) + "C", DATA_X + VALUE_OFFSET_X, DATA_Y + LINE_HEIGHT);
+
+    // RAM Data
+    tft.fillRect(DATA_X + VALUE_OFFSET_X, DATA_Y + 2 * LINE_HEIGHT, VALUE_WIDTH, LINE_HEIGHT, BG_COLOR);
+    tft.setTextColor(TFT_RED, BG_COLOR);
+    tft.drawString(String(pcData.ramLoad, 1) + "%", DATA_X + VALUE_OFFSET_X, DATA_Y + 2 * LINE_HEIGHT);
 
     static float gx = 0.0;
     cpuLoadTrace.addPoint(gx, pcData.cpuLoad);
@@ -100,22 +142,27 @@ void updatePerformanceData() {
     gx += 1.0;
     if (gx > 100.0) {
       gx = 0.0;
-      cpuGpuLoadChart.drawGraph(14, 60);
+      cpuGpuLoadChart.drawGraph(CHART1_X, CHART1_Y);
       cpuLoadTrace.startTrace(TFT_GREEN);
       gpuLoadTrace.startTrace(TFT_BLUE);
-      cpuGpuTempChart.drawGraph(14, 110);
+      cpuGpuTempChart.drawGraph(CHART2_X, CHART2_Y);
       cpuTempTrace.startTrace(TFT_RED);
       gpuTempTrace.startTrace(TFT_ORANGE);
     }
 
   } else {
-    tft.fillRect(DATA_X + 40, DATA_Y + LINE_HEIGHT, 80, 3 * LINE_HEIGHT, BG_COLOR);
+    tft.fillRect(DATA_X + VALUE_OFFSET_X, DATA_Y, VALUE_WIDTH, 3 * LINE_HEIGHT, BG_COLOR);
     tft.setTextColor(ERROR_COLOR, BG_COLOR);
-    tft.drawString("No Data", DATA_X + 40, DATA_Y + LINE_HEIGHT);
+    tft.setTextSize(2);
+    tft.drawString("No Data", DATA_X + VALUE_OFFSET_X, DATA_Y);
   }
-  tft.fillRect(DATA_X + 60, DATA_Y + 4 * LINE_HEIGHT, 60, LINE_HEIGHT, BG_COLOR);
-  tft.setTextColor(VALUE_COLOR, BG_COLOR);
-  tft.drawString(String(esp32c3_temp, 1) + "°C", DATA_X + 60, DATA_Y + 4 * LINE_HEIGHT);
+  
+  // ESP32 Temp
+  tft.fillRect(DATA_X + VALUE_OFFSET_X, DATA_Y + 3 * LINE_HEIGHT, VALUE_WIDTH, LINE_HEIGHT, BG_COLOR);
+  tft.setTextColor(TFT_ORANGE, BG_COLOR);
+  tft.setTextSize(2);
+  tft.drawString(String(esp32c3_temp, 1) + " C", DATA_X + VALUE_OFFSET_X, DATA_Y + 3 * LINE_HEIGHT);
+  
   xSemaphoreGive(xPCDataMutex);
 }
 

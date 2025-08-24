@@ -16,6 +16,12 @@
         "ios": "cpp",
         "functional": "cpp",
         "system_error": "cpp",
-        "xlocale": "cpp"
+        "xlocale": "cpp",
+        "charconv": "cpp",
+        "istream": "cpp",
+        "atomic": "cpp",
+        "memory": "cpp",
+        "map": "cpp",
+        "algorithm": "cpp"
     }
 }
