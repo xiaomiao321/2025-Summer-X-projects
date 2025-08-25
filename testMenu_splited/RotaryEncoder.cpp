@@ -77,7 +77,7 @@ int readEncoder() {
       deltaSum = 0;  // 重置累积增量
     }
 
-    lastEncoded = currentEncoded;
+    lastEncoded = currentEncoded; // Move this line here
   }
 
   return delta;
@@ -99,4 +99,9 @@ int readButton() {
   }
 
   return pressed;
+}
+
+// 获取按钮的当前去抖动状态
+int getButtonCurrentState() {
+  return lastButtonState; // Return the debounced state maintained by readButton()
 }

@@ -388,6 +388,7 @@ select_song:
         displayOffset = selectedSongIndex - visibleSongs + 1;
       }
       displaySongList(selectedSongIndex);
+      tone(BUZZER_PIN, 1000, 50); // Add a short tone when switching songs
       Serial.printf("当前选择歌曲：%s\n", songs[selectedSongIndex].name);
     }
     if (readButton()) {

@@ -1,6 +1,9 @@
 #include "weather.h"
 #include "menu.h"
 #include "RotaryEncoder.h"
+#include <sys/time.h> // For settimeofday
+#include <time.h>     // For mktime
+
 const long GMT_OFFSET_SEC = 8 * 3600; // Keep for initial time setup if needed
 const int DAYLIGHT_OFFSET = 0; // Keep for initial time setup if needed
 
@@ -21,6 +24,9 @@ struct tm timeinfo;
 
 #define PERCENTAGE_TEXT_X (DATA_X + BAR_WIDTH + 10)
 
+// Double click constants
+#define DOUBLE_CLICK_THRESHOLD_MS 300 // Max time between clicks for double click
+
 // -----------------------------
 // 绘制静态元素
 // -----------------------------
@@ -29,6 +35,7 @@ void drawWeatherStaticElements() {
   tft.setTextColor(TITLE_COLOR, BG_COLOR);
   tft.setTextSize(1);
   tft.setTextDatum(TL_DATUM);
+  tft.drawString("Time:", DATA_X, DATA_Y);
 }
 
 // -----------------------------
@@ -94,6 +101,8 @@ void Weather_Init_Task(void *pvParameters) {
   // If an external RTC is present, its initialization would go here.
   vTaskDelete(NULL);
 }
+
+
 
 // -----------------------------
 // 天气显示任务

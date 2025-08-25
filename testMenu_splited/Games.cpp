@@ -8,6 +8,34 @@
 #include "DS18B20.h"
 #include "animation.h"
 #include "Games.h"
+#include <vector> // For std::vector
+
+// Snake Game Constants
+#define SNAKE_GRID_WIDTH  20
+#define SNAKE_GRID_HEIGHT 20
+#define SNAKE_CELL_SIZE   10 // Pixels per cell
+#define SNAKE_START_X     (SCREEN_WIDTH / 2 - (SNAKE_GRID_WIDTH * SNAKE_CELL_SIZE) / 2)
+#define SNAKE_START_Y     (SCREEN_HEIGHT / 2 - (SNAKE_GRID_HEIGHT * SNAKE_CELL_SIZE) / 2)
+#define SNAKE_INITIAL_LENGTH 3
+#define SNAKE_GAME_SPEED_MS 200 // Milliseconds per frame
+
+enum SnakeDirection {
+  SNAKE_UP,
+  SNAKE_DOWN,
+  SNAKE_LEFT,
+  SNAKE_RIGHT
+};
+
+struct Point {
+  int x;
+  int y;
+};
+
+std::vector<Point> snakeBody;
+Point food;
+SnakeDirection currentDirection;
+bool gameOver;
+int snakeScore;
 
 // --- Layout Configuration ---
 static const int ICON_SIZE = 200;
@@ -81,7 +109,7 @@ const GameItem gameItems[] = {
     {"Conway's Game", Conway, ConwayGame},
     {"Snake Game", snake, tanchisheGame},
     {"Buzzer Tap", Sound, BuzzerTapGame},
-    {"Time Challenge", Conway, TimeChallengeGame},
+    {"Time Challenge", Time, TimeChallengeGame},
 };
 const uint8_t GAME_ITEM_COUNT = sizeof(gameItems) / sizeof(gameItems[0]);
 
@@ -89,9 +117,11 @@ const uint8_t GAME_ITEM_COUNT = sizeof(gameItems) / sizeof(gameItems[0]);
 void drawGameIcons(int16_t offset) {
     menuSprite.fillSprite(TFT_BLACK);
 
-    // Selection triangle indicator
+    // Selection triangle indicator (moved to bottom)
     int16_t triangle_x = offset + (game_picture_flag * ICON_SPACING) + (ICON_SIZE / 2);
-    menuSprite.fillTriangle(triangle_x, TRIANGLE_BASE_Y, triangle_x - 12, TRIANGLE_PEAK_Y, triangle_x + 12, TRIANGLE_PEAK_Y, TFT_WHITE);
+    // New Y-coordinates for triangle at the bottom, pointing downwards
+    // Peak at SCREEN_HEIGHT - 5, Base at SCREEN_HEIGHT - 25
+    menuSprite.fillTriangle(triangle_x, SCREEN_HEIGHT - 25, triangle_x - 12, SCREEN_HEIGHT - 5, triangle_x + 12, SCREEN_HEIGHT - 5, TFT_WHITE);
 
     // Icons
     for (int i = 0; i < GAME_ITEM_COUNT; i++) {
@@ -107,7 +137,7 @@ void drawGameIcons(int16_t offset) {
     menuSprite.setTextDatum(TL_DATUM);
     menuSprite.drawString("GAMES:", 10, 10);
     menuSprite.drawString(gameItems[game_picture_flag].name, 60, 10); // Corrected variable
-    menuSprite.drawString("Select", 10, 220);
+    // Removed: menuSprite.drawString("Select", 10, 220);
 
     menuSprite.pushSprite(0, 0);
 }
@@ -281,24 +311,160 @@ void ConwayGame() {
 }
 
 // --- Placeholder for Snake Game ---
-void tanchisheGame() {
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.setTextSize(2);
-    tft.setCursor(40, 100);
-    tft.print("Snake Game");
-    tft.setTextSize(1);
-    tft.setCursor(35, 140);
-    tft.print("Double-click to exit");
+void initSnakeGame();
+void drawSnake();
+void generateFood();
+void updateSnake();
+void handleSnakeInput();
+void drawGameOver();
 
-    while (true) {
-        if (readButton()) { // Use readButton() directly
-            if (gamesDetectDoubleClick()) { // Double click detected
-                return; // Exit tanchisheGame
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
+void tanchisheGame() {
+  initSnakeGame(); // Initialize game state
+
+  tft.fillScreen(TFT_BLACK); // Clear screen
+  tft.drawRect(SNAKE_START_X - 1, SNAKE_START_Y - 1, SNAKE_GRID_WIDTH * SNAKE_CELL_SIZE + 2, SNAKE_GRID_HEIGHT * SNAKE_CELL_SIZE + 2, TFT_WHITE); // Draw border
+  drawSnake(); // Initial draw of the snake and food
+
+  unsigned long lastGameUpdateTime = millis();
+
+  while (true) {
+    // Input handling
+    handleSnakeInput();
+
+    // Game update logic
+    unsigned long currentTime = millis();
+    if (!gameOver && (currentTime - lastGameUpdateTime > SNAKE_GAME_SPEED_MS)) {
+      updateSnake();
+      drawSnake(); // Redraw only after snake state updates
+      lastGameUpdateTime = currentTime;
     }
+
+    // Game over check and display
+    if (gameOver) {
+      drawGameOver();
+    }
+
+    // Exit condition (double click)
+    if (readButton()) {
+      if (gamesDetectDoubleClick()) {
+        return; // Exit game
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(10)); // Small delay for responsiveness
+  }
+}
+
+void initSnakeGame() {
+  snakeBody.clear();
+  for (int i = 0; i < SNAKE_INITIAL_LENGTH; ++i) {
+    snakeBody.push_back({SNAKE_GRID_WIDTH / 2, SNAKE_GRID_HEIGHT / 2 + i}); // Start in middle, moving up
+  }
+  currentDirection = SNAKE_UP;
+  gameOver = false;
+  snakeScore = 0;
+  generateFood();
+}
+
+void drawSnake() {
+  // This version clears the play area first, then redraws everything.
+  // This is the simplest way to fix the "trail" bug.
+  tft.fillRect(SNAKE_START_X, SNAKE_START_Y, SNAKE_GRID_WIDTH * SNAKE_CELL_SIZE, SNAKE_GRID_HEIGHT * SNAKE_CELL_SIZE, TFT_BLACK);
+
+  // Draw food (always redraw to ensure it's visible)
+  tft.fillRect(SNAKE_START_X + food.x * SNAKE_CELL_SIZE, SNAKE_START_Y + food.y * SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, TFT_RED);
+
+  // Draw the entire snake body
+  for (const auto& segment : snakeBody) {
+    tft.fillRect(SNAKE_START_X + segment.x * SNAKE_CELL_SIZE, SNAKE_START_Y + segment.y * SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, TFT_GREEN);
+  }
+
+  // Draw score
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.setCursor(10, 10);
+  tft.printf("Score: %d", snakeScore);
+}
+
+void generateFood() {
+  bool foodOnSnake;
+  do {
+    food.x = random(SNAKE_GRID_WIDTH);
+    food.y = random(SNAKE_GRID_HEIGHT);
+    foodOnSnake = false;
+    for (const auto& segment : snakeBody) {
+      if (segment.x == food.x && segment.y == food.y) {
+        foodOnSnake = true;
+        break;
+      }
+    }
+  } while (foodOnSnake);
+}
+
+void updateSnake() {
+  // Move head
+  Point newHead = snakeBody.front();
+  switch (currentDirection) {
+    case SNAKE_UP:    newHead.y--; break;
+    case SNAKE_DOWN:  newHead.y++; break;
+    case SNAKE_LEFT:  newHead.x--; break;
+    case SNAKE_RIGHT: newHead.x++; break;
+  }
+
+  // Collision with walls
+  if (newHead.x < 0 || newHead.x >= SNAKE_GRID_WIDTH ||
+      newHead.y < 0 || newHead.y >= SNAKE_GRID_HEIGHT) {
+    gameOver = true;
+    return;
+  }
+
+  // Collision with self (start from index 1 to avoid checking against the current head)
+  for (size_t i = 1; i < snakeBody.size(); ++i) {
+    if (newHead.x == snakeBody[i].x && newHead.y == snakeBody[i].y) {
+      gameOver = true;
+      return;
+    }
+  }
+
+  snakeBody.insert(snakeBody.begin(), newHead); // Add new head
+
+  // Check if food is eaten
+  if (newHead.x == food.x && newHead.y == food.y) {
+    snakeScore++;
+    generateFood();
+  } else {
+    snakeBody.pop_back(); // Remove tail if no food eaten
+  }
+}
+
+void handleSnakeInput() {
+  int encoderDelta = readEncoder();
+  if (encoderDelta != 0) {
+    if (encoderDelta == 1) { // Clockwise rotation
+      switch (currentDirection) {
+        case SNAKE_UP:    currentDirection = SNAKE_RIGHT; break;
+        case SNAKE_RIGHT: currentDirection = SNAKE_DOWN;  break;
+        case SNAKE_DOWN:  currentDirection = SNAKE_LEFT;  break;
+        case SNAKE_LEFT:  currentDirection = SNAKE_UP;    break;
+      }
+    } else if (encoderDelta == -1) { // Counter-clockwise rotation
+      switch (currentDirection) {
+        case SNAKE_UP:    currentDirection = SNAKE_LEFT;  break;
+        case SNAKE_LEFT:  currentDirection = SNAKE_DOWN;  break;
+        case SNAKE_DOWN:  currentDirection = SNAKE_RIGHT; break;
+        case SNAKE_RIGHT: currentDirection = SNAKE_UP;    break;
+      }
+    }
+  }
+}
+
+void drawGameOver() {
+  tft.setTextColor(TFT_RED, TFT_BLACK);
+  tft.setTextSize(2);
+  tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("GAME OVER") / 2, SCREEN_HEIGHT / 2 - 10);
+  tft.print("GAME OVER");
+  tft.setTextSize(1);
+  tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("Score: ") / 2, SCREEN_HEIGHT / 2 + 10);
+  tft.printf("Score: %d", snakeScore);
 }
 
 
@@ -355,11 +521,19 @@ void BuzzerTapGame() {
     }
 }
 
-// --- Time Challenge Game Implementation ---
+// Constants for Time Challenge Game Progress Bar
+static const int PROGRESS_BAR_X = 20;
+static const int PROGRESS_BAR_Y = 180; // Below Timer and Diff
+static const int PROGRESS_BAR_WIDTH = 200;
+static const int PROGRESS_BAR_HEIGHT = 10;
+static const uint16_t PROGRESS_BAR_COLOR = TFT_GREEN;
+static const uint16_t PROGRESS_BAR_BG_COLOR = TFT_DARKGREY;
+
+
 void TimeChallengeGame() {
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.setTextSize(2);
+    tft.setTextSize(2); // Initial text size for Target and Timer labels
 
     unsigned long targetTimeMs = random(8000, 12001); // 10 to 20 seconds
     float targetTimeSec = targetTimeMs / 1000.0;
@@ -368,11 +542,15 @@ void TimeChallengeGame() {
     tft.printf("Target: %.1f s", targetTimeSec);
 
     tft.setCursor(20, 80);
-    tft.print("Timer: 0.0 s");
+    tft.print("Timer: 0.0 s"); // Timer label
 
-    tft.setTextSize(1);
-    tft.setCursor(35, 180);
-    tft.print("Press at target, Double-click to exit");
+    // Draw progress bar background
+    tft.drawRect(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_WHITE); // Border for the bar
+    tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Background fill
+
+    // Draw progress bar background
+    tft.drawRect(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_WHITE); // Border for the bar
+    tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Background fill
 
     unsigned long startTime = millis();
     unsigned long pressTime = 0;
@@ -384,8 +562,30 @@ void TimeChallengeGame() {
         if (!gameEnded) {
             float elapsedSec = (currentTime - startTime) / 1000.0;
             tft.fillRect(100, 80, 120, 20, TFT_BLACK); // Clear old timer
+            tft.setTextSize(3); // Set larger size for timer number
             tft.setCursor(100, 80);
-            tft.printf("%.1f s", elapsedSec);
+            tft.printf("%.1f s", elapsedSec); // <-- TIMER NUMBER
+            tft.setTextSize(2); // Reset to default size for labels
+
+            // Update progress bar
+            float progressRatio = (float)(currentTime - startTime) / targetTimeMs;
+            int filledWidth = (int)(progressRatio * PROGRESS_BAR_WIDTH);
+            
+            // Ensure filledWidth does not exceed PROGRESS_BAR_WIDTH
+            if (filledWidth > PROGRESS_BAR_WIDTH) {
+                filledWidth = PROGRESS_BAR_WIDTH;
+            }
+            
+            // Clear previous progress and draw new progress
+            tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Clear the filled part
+            tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, filledWidth, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_COLOR); // Draw new filled part
+
+            
+            // Ensure filledWidth does not exceed PROGRESS_BAR_WIDTH
+            if (filledWidth > PROGRESS_BAR_WIDTH) {
+                filledWidth = PROGRESS_BAR_WIDTH;
+            }
+            
         }
 
         if (readButton()) { // Use readButton() directly
@@ -397,13 +597,10 @@ void TimeChallengeGame() {
                     gameEnded = true;
                     tone(BUZZER_PIN, 1500, 100); // Confirmation sound
                     
-                    float diffSec = (pressTime - startTime - targetTimeMs) / 1000.0;
+                    float diffSec = (float)((long)(pressTime - startTime) - (long)targetTimeMs) / 1000.0;
                     tft.setTextSize(2);
                     tft.setCursor(20, 130);
                     tft.printf("Diff: %.2f s", diffSec);
-                    tft.setTextSize(1); // Reset text size
-                    tft.setCursor(35, 200);
-                    tft.print("Double-click to exit");
                 }
             }
         }

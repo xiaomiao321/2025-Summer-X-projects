@@ -18,9 +18,11 @@ static const int SCREEN_HEIGHT = 240;
 
 // Calculated layout values
 static const int ICON_Y_POS = (SCREEN_HEIGHT / 2) - (ICON_SIZE / 2); // Center the icon vertically
-static const int TRIANGLE_BASE_Y = ICON_Y_POS - 5;                   // Triangle base sits just above the icon
-static const int TRIANGLE_PEAK_Y = TRIANGLE_BASE_Y - 20;             // Triangle peak is 20px higher
+
 static const int INITIAL_X_OFFSET = (SCREEN_WIDTH / 2) - (ICON_SIZE / 2); // Center the first icon
+
+static const int TRIANGLE_BASE_Y = ICON_Y_POS - 5;
+static const int TRIANGLE_PEAK_Y = TRIANGLE_BASE_Y - 20;
 
 int16_t display = INITIAL_X_OFFSET; // Icon initial x-offset
 uint8_t picture_flag = 0;           // Current selected menu item index
@@ -77,7 +79,7 @@ void drawMenuIcons(int16_t offset) {
 
     // Selection triangle indicator
     int16_t triangle_x = offset + (picture_flag * ICON_SPACING) + (ICON_SIZE / 2);
-    menuSprite.fillTriangle(triangle_x, TRIANGLE_BASE_Y, triangle_x - 12, TRIANGLE_PEAK_Y, triangle_x + 12, TRIANGLE_PEAK_Y, TFT_WHITE);
+    menuSprite.fillTriangle(triangle_x, SCREEN_HEIGHT - 25, triangle_x - 12, SCREEN_HEIGHT - 5, triangle_x + 12, SCREEN_HEIGHT - 5, TFT_WHITE);
 
     // Icons
     for (int i = 0; i < MENU_ITEM_COUNT; i++) {
@@ -93,7 +95,7 @@ void drawMenuIcons(int16_t offset) {
     menuSprite.setTextDatum(TL_DATUM);
     menuSprite.drawString("MENU:", 10, 10);
     menuSprite.drawString(menuItems[picture_flag].name, 50, 10);
-    menuSprite.drawString("Select", 10, 220); // Bottom hint
+    
 
     menuSprite.pushSprite(0, 0);
 }

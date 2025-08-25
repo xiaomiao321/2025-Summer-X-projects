@@ -25,6 +25,7 @@
         "algorithm": "cpp",
         "type_traits": "cpp",
         "cstdlib": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "condition_variable": "cpp"
     }
 }
