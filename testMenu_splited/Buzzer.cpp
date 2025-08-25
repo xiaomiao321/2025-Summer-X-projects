@@ -148,20 +148,47 @@ typedef struct {
   int* melody;      // 音符序列
   int* durations;   // 节拍时长
   int length;       // 音符数量
+  int colorSchemeIndex; // New: Index to colorSchemes array
 } Song;
 
 
 
 // 歌曲列表
 Song songs[] = {
-  {"Da Hai", melody_da_hai, durations_da_hai, sizeof(melody_da_hai) / sizeof(melody_da_hai[0])},
-  {"Happy Birthday", melody_happy_birthday, durations_happy_birthday, sizeof(melody_happy_birthday) / sizeof(melody_happy_birthday[0])},
-  {"Yu Jian", melody_yu_jian, durations_yu_jian, sizeof(melody_yu_jian) / sizeof(melody_yu_jian[0])},
-  {"Two Tigers", melody_two_tigers, durations_two_tigers, sizeof(melody_two_tigers) / sizeof(melody_two_tigers[0])},
-  {"Mary Had a Lamb", melody_mary_lamb, durations_mary_lamb, sizeof(melody_mary_lamb) / sizeof(melody_mary_lamb[0])},
-  {"Jingle Bells", melody_jingle_bells, durations_jingle_bells, sizeof(melody_jingle_bells) / sizeof(melody_jingle_bells[0])}
+  {"Da Hai", melody_da_hai, durations_da_hai, sizeof(melody_da_hai) / sizeof(melody_da_hai[0]), 0}, // Scheme 0
+  {"Happy Birthday", melody_happy_birthday, durations_happy_birthday, sizeof(melody_happy_birthday) / sizeof(melody_happy_birthday[0]), 1}, // Scheme 1
+  {"Yu Jian", melody_yu_jian, durations_yu_jian, sizeof(melody_yu_jian) / sizeof(melody_yu_jian[0]), 2}, // Scheme 2
+  {"Two Tigers", melody_two_tigers, durations_two_tigers, sizeof(melody_two_tigers) / sizeof(melody_two_tigers[0]), 3}, // Scheme 3
+  {"Mary Had a Lamb", melody_mary_lamb, durations_mary_lamb, sizeof(melody_mary_lamb) / sizeof(melody_mary_lamb[0]), 4}, // Scheme 4
+  {"Jingle Bells", melody_jingle_bells, durations_jingle_bells, sizeof(melody_jingle_bells) / sizeof(melody_jingle_bells[0]), 0} // Scheme 0
 };
 const int numSongs = sizeof(songs) / sizeof(songs[0]);
+
+// Color scheme structure
+typedef struct {
+  uint16_t bgColorStart; // Background gradient start color
+  uint16_t bgColorEnd;   // Background gradient end color
+  uint16_t frameColor1;  // Frame color 1
+  uint16_t frameColor2;  // Frame color 2
+  uint16_t frameColor3;  // Frame color 3
+  uint16_t textColor;    // Normal text color
+  uint16_t highlightColor; // Highlighted text color
+} ColorScheme;
+
+// Define some color schemes
+const ColorScheme colorSchemes[] = {
+  // Scheme 0: Default Blue
+  {TFT_BLUE, TFT_CYAN, TFT_CYAN, TFT_WHITE, TFT_BLUE, TFT_WHITE, TFT_YELLOW},
+  // Scheme 1: Greenish
+  {TFT_DARKGREEN, TFT_GREEN, TFT_GREEN, TFT_WHITE, TFT_GREENYELLOW, TFT_WHITE, TFT_ORANGE}, // TFT_LIME replaced with TFT_GREENYELLOW
+  // Scheme 2: Purplish
+  {TFT_PURPLE, TFT_MAGENTA, TFT_MAGENTA, TFT_WHITE, TFT_PINK, TFT_WHITE, TFT_CYAN},
+  // Scheme 3: Reddish
+  {TFT_MAROON, TFT_RED, TFT_RED, TFT_WHITE, TFT_ORANGE, TFT_WHITE, TFT_YELLOW}, // TFT_DARKRED replaced with TFT_MAROON
+  // Scheme 4: Greyish
+  {TFT_DARKGREY, TFT_LIGHTGREY, TFT_LIGHTGREY, TFT_WHITE, TFT_SILVER, TFT_WHITE, TFT_YELLOW},
+};
+const int numColorSchemes = sizeof(colorSchemes) / sizeof(colorSchemes[0]);
 
 // Map frequency to a more distinct color for NeoPixel
 uint32_t mapFrequencyToColor(int frequency) {
@@ -180,6 +207,23 @@ uint32_t mapFrequencyToColor(int frequency) {
   } else { // High notes
     return strip.Color(128, 0, 255); // Purple
   }
+}
+
+// Helper function to interpolate 565 colors
+uint16_t interpolateColor(uint16_t color1, uint16_t color2, float ratio) {
+  uint8_t r1 = (color1 >> 11) & 0x1F;
+  uint8_t g1 = (color1 >> 5) & 0x3F;
+  uint8_t b1 = (color1) & 0x1F;
+
+  uint8_t r2 = (color2 >> 11) & 0x1F;
+  uint8_t g2 = (color2 >> 5) & 0x3F;
+  uint8_t b2 = (color2) & 0x1F;
+
+  uint8_t r = r1 + (r2 - r1) * ratio;
+  uint8_t g = g1 + (g2 - g1) * ratio;
+  uint8_t b = b1 + (b2 - b1) * ratio;
+
+  return tft.color565(r, g, b);
 }
 
 // LED effects (blocking versions, to be run in separate task)
@@ -211,6 +255,7 @@ int selectedSongIndex = 0;
 int displayOffset = 0; // 滚动偏移
 const int visibleSongs = 3; // 屏幕可见歌曲数
 bool firstDraw = true; // 全局绘制标志
+bool isPaused = false; // Flag to control pause/resume
 
 // Communication struct for LED Task
 typedef struct {
@@ -250,18 +295,22 @@ void initInternalRTC() {
 
 // 显示歌曲选择列表
 void displaySongList(int selectedIndex) {
-  // 渐变背景（深蓝到浅蓝）
+  // Get current color scheme
+  const ColorScheme& currentScheme = colorSchemes[songs[selectedIndex].colorSchemeIndex];
+
+  // Background gradient
   for (int y = 0; y < 240; y++) {
-    uint16_t color = tft.color565(0, 0, 50 + y / 2); // 深蓝到浅蓝
-    tft.drawFastHLine(0, y, 240, color);
+    uint16_t interpolatedColor = interpolateColor(currentScheme.bgColorStart, currentScheme.bgColorEnd, (float)y / 239.0);
+    tft.drawFastHLine(0, y, 240, interpolatedColor);
   }
-  // 动态边框（颜色循环）
+
+  // Dynamic border
   static int frameColorIndex = 0;
-  uint16_t frameColors[] = {TFT_CYAN, TFT_WHITE, TFT_BLUE};
+  uint16_t frameColors[] = {currentScheme.frameColor1, currentScheme.frameColor2, currentScheme.frameColor3};
   tft.drawRect(5, 5, 230, 230, frameColors[frameColorIndex % 3]);
   frameColorIndex++;
 
-  tft.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
+  tft.setTextColor(currentScheme.textColor, TFT_TRANSPARENT); // Use scheme text color
   tft.setTextSize(2);
   tft.setCursor(10, 10);
   tft.println("Song Menu");
@@ -274,18 +323,18 @@ void displaySongList(int selectedIndex) {
   tft.print("Time: ");
   tft.print(timeStr);
 
-  tft.setTextWrap(true); // 启用换行
+  tft.setTextWrap(true);
   for (int i = 0; i < visibleSongs; i++) {
     int songIdx = displayOffset + i;
     if (songIdx >= numSongs) break;
-    tft.setCursor(10, 60 + i * 40); // 间隔 40
+    tft.setCursor(10, 60 + i * 40);
     if (songIdx == selectedIndex) {
-      tft.setTextSize(2); // 选中歌曲稍大
-      tft.setTextColor(TFT_YELLOW, TFT_TRANSPARENT);
+      tft.setTextSize(2);
+      tft.setTextColor(currentScheme.highlightColor, TFT_TRANSPARENT); // Use scheme highlight color
       tft.print("> ");
       tft.println(songs[songIdx].name);
-      tft.setTextSize(1); // 非选中歌曲
-      tft.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
+      tft.setTextSize(1);
+      tft.setTextColor(currentScheme.textColor, TFT_TRANSPARENT); // Use scheme text color for non-selected
     } else {
       tft.setTextSize(1);
       tft.println(songs[songIdx].name);
@@ -294,7 +343,7 @@ void displaySongList(int selectedIndex) {
 }
 
 // 显示播放界面
-void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int currentNote) {
+void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int currentNote, const ColorScheme& scheme) {
   static int lastNoteIndex = -1;
   static int wavePoints[48][2]; // 存储上一帧波形点（240/5=48 个点）
 
@@ -302,10 +351,10 @@ void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int curren
     // 首次绘制背景和静态元素
     // 渐变背景
     for (int y = 0; y < 240; y++) {
-      uint16_t color = tft.color565(0, 50 + y / 2, 0); // 深绿到浅绿
-      tft.drawFastHLine(0, y, 240, color);
+      uint16_t interpolatedColor = interpolateColor(scheme.bgColorStart, scheme.bgColorEnd, (float)y / 239.0);
+      tft.drawFastHLine(0, y, 240, interpolatedColor);
     }
-    tft.setTextColor(TFT_GREEN, TFT_TRANSPARENT);
+    tft.setTextColor(scheme.textColor, TFT_TRANSPARENT); // Use scheme text color
     tft.setTextSize(2);
     tft.setCursor(10, 30);
     tft.print("Playing: ");
@@ -316,34 +365,36 @@ void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int curren
     tft.printf("Duration: %.1f s", calculateSongDuration(&songs[songIndex]));
 
     // 进度条背景
-    tft.fillRect(20, 130, 200, 10, TFT_DARKGREY);
+    tft.fillRect(20, 130, 200, 10, TFT_DARKGREY); // Keep darkgrey for now, can be scheme color later
 
     // 初始化波形区域
-    tft.fillRect(0, 160, 240, 60, tft.color565(0, 50 + 160 / 2, 0)); // 使用背景色
+    tft.fillRect(0, 160, 240, 60, interpolateColor(scheme.bgColorStart, scheme.bgColorEnd, (float)160 / 239.0)); // Use scheme background color
     firstDraw = false;
   } else if (noteIndex != lastNoteIndex) {
     // 更新动态部分
     // 动态边框
     static int frameColorIndex = 0;
-    uint16_t frameColors[] = {TFT_CYAN, TFT_GREEN, TFT_BLUE};
+    uint16_t frameColors[] = {scheme.frameColor1, scheme.frameColor2, scheme.frameColor3}; // Use scheme frame colors
     tft.drawRect(5, 5, 230, 230, frameColors[frameColorIndex % 3]);
     frameColorIndex++;
 
     // 更新音符进度
-    tft.fillRect(10, 80, 200, 20, tft.color565(0, 50 + 80 / 2, 0)); // 覆盖旧进度文本
+    tft.fillRect(10, 80, 200, 20, interpolateColor(scheme.bgColorStart, scheme.bgColorEnd, (float)80 / 239.0)); // Clear with scheme background
     tft.setTextSize(1);
-    tft.setTextColor(TFT_GREEN, TFT_TRANSPARENT);
+    tft.setTextColor(scheme.textColor, TFT_TRANSPARENT); // Use scheme text color
     tft.setCursor(10, 80);
     tft.printf("Note: %d/%d", noteIndex + 1, totalNotes);
 
     // 更新进度条
     int progressWidth = (noteIndex + 1) * 200 / totalNotes;
-    tft.fillRect(20, 130, progressWidth, 10, TFT_BLUE);
+    tft.fillRect(20, 130, progressWidth, 10, scheme.highlightColor); // Use scheme highlight color for progress
+    // Clear remaining part of progress bar
+    tft.fillRect(20 + progressWidth, 130, 200 - progressWidth, 10, TFT_DARKGREY); // Keep darkgrey for now
 
     // 清除旧波形
     for (int i = 0; i < 48; i++) {
       if (wavePoints[i][0] >= 0) { // 有效点
-        tft.fillCircle(wavePoints[i][0], wavePoints[i][1], 3, tft.color565(0, 50 + 160 / 2, 0)); // 背景色
+        tft.fillCircle(wavePoints[i][0], wavePoints[i][1], 3, interpolateColor(scheme.bgColorStart, scheme.bgColorEnd, (float)wavePoints[i][1] / 239.0)); // Clear with scheme background
       }
     }
 
@@ -358,7 +409,7 @@ void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int curren
   for (int i = 0; i < 48; i++) {
     int x = i * 5;
     int y = 190 + sin((x + waveOffset) * 0.1 * (freq / 100.0)) * amplitude;
-    tft.fillCircle(x, y, 3, TFT_YELLOW);
+    tft.fillCircle(x, y, 3, scheme.highlightColor); // Use scheme highlight color for waveform
     wavePoints[i][0] = x;
     wavePoints[i][1] = y;
   }
@@ -373,24 +424,62 @@ void Buzzer_Init_Task(void *pvParameters) {
 
 // LED Animation Task
 void Led_Task(void *pvParameters) {
+  static int colorWipePixel = 0; // State for colorWipe
+  static long rainbowHue = 0;    // State for rainbow
+  static int currentEffect = 0;  // 0: None, 1: ColorWipe, 2: Rainbow, 3: FillColor
+
   for (;;) {
     if (stopLedTask) { // Check stop flag
       strip.clear();
       strip.show();
       vTaskDelete(NULL); // Delete task
     }
-    // Check if there's a new command
-    if (currentLedCommand.effectType != 0) {
-      if (currentLedCommand.effectType == 1) { // ColorWipe
-        colorWipe(currentLedCommand.color, 10); // Run colorWipe
-      } else if (currentLedCommand.effectType == 2) { // Rainbow
-        rainbow(10); // Run rainbow
-      } else if (currentLedCommand.effectType == 3) { // FillColor
+
+    // Process new command (only if no effect is currently running)
+    if (currentLedCommand.effectType != 0 && currentEffect == 0) {
+      currentEffect = currentLedCommand.effectType; // Set current effect
+      // Reset state for new effect
+      colorWipePixel = 0;
+      rainbowHue = 0;
+
+      if (currentEffect == 3) { // FillColor is instant
         strip.fill(currentLedCommand.color);
         strip.show();
+        currentEffect = 0; // Mark as finished
       }
-      currentLedCommand.effectType = 0; // Reset command after execution
+      currentLedCommand.effectType = 0; // Reset command after processing
     }
+
+    // Continue current effect (if any)
+    if (currentEffect == 1) { // ColorWipe (step by step)
+      if (colorWipePixel < strip.numPixels()) {
+        strip.setPixelColor(colorWipePixel, currentLedCommand.color);
+        strip.show();
+        colorWipePixel++;
+      } else {
+        // Effect finished
+        vTaskDelay(pdMS_TO_TICKS(50)); // Hold for a moment
+        strip.clear();
+        strip.show();
+        currentEffect = 0; // Mark as finished
+      }
+    } else if (currentEffect == 2) { // Rainbow (step by step)
+      if (rainbowHue < 3 * 65536) { // Continue rainbow
+        for (int i = 0; i < strip.numPixels(); i++) {
+          int pixelHue = rainbowHue + (i * 65536L / strip.numPixels());
+          strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue)));
+        }
+        strip.show();
+        rainbowHue += 256; // Advance hue
+      } else {
+        // Effect finished
+        vTaskDelay(pdMS_TO_TICKS(50)); // Hold for a moment
+        strip.clear();
+        strip.show();
+        currentEffect = 0; // Mark as finished
+      }
+    }
+
     vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other tasks
   }
 }
@@ -409,6 +498,13 @@ void Buzzer_Task(void *pvParameters) {
       firstDraw = true; // 重置绘制标志
       break;
     }
+
+    // Pause/Resume logic
+    if (isPaused) {
+      vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other tasks while paused
+      continue; // Skip playing notes
+    }
+
     for (int i = 0; i < song->length; i++) {
       if (stopBuzzerTask) {
         noTone(BUZZER_PIN);
@@ -424,7 +520,7 @@ void Buzzer_Task(void *pvParameters) {
       currentLedCommand.color = mapFrequencyToColor(song->melody[i]);
       currentLedCommand.frequency = song->melody[i];
       
-      displayPlayingSong(songIndex, i, song->length, song->melody[i]);
+      displayPlayingSong(songIndex, i, song->length, song->melody[i], colorSchemes[song->colorSchemeIndex]);
       vTaskDelay(pdMS_TO_TICKS(song->durations[i] * 1.3));
       noTone(BUZZER_PIN);
       // Led_Task will handle clearing the strip after the effect
@@ -514,24 +610,6 @@ select_song:
       if (detectDoubleClick()) { // 双击返回主菜单
         Serial.println("双击检测到，返回主菜单");
         stopBuzzerTask = true;
-        TaskHandle_t taskHandle = xTaskGetHandle("Buzzer_Task");
-        if (taskHandle != NULL) {
-          const TickType_t xTimeout = pdMS_TO_TICKS(100);
-          while (eTaskGetState(taskHandle) != eDeleted && xTimeout > 0) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-          }
-        }
-        TaskHandle_t initHandle = xTaskGetHandle("Buzzer_Init");
-        if (initHandle != NULL) {
-          vTaskDelete(initHandle);
-        }
-        display = 48;
-        picture_flag = 0;
-        showMenuConfig();
-        return;
-      } else { // 单击返回歌曲选择
-        Serial.println("单击检测到，返回歌曲选择");
-        stopBuzzerTask = true;
         stopLedTask = true; // Signal Led_Task to stop
         TaskHandle_t buzzerTaskHandle = xTaskGetHandle("Buzzer_Task");
         if (buzzerTaskHandle != NULL) {
@@ -548,8 +626,23 @@ select_song:
         if (initHandle != NULL) {
           vTaskDelete(initHandle);
         }
-        firstDraw = true; // 重置绘制标志
-        goto select_song;
+        display = 48;
+        picture_flag = 0;
+        showMenuConfig();
+        return;
+      } else { // 单击：暂停/继续
+        isPaused = !isPaused; // Toggle pause state
+        if (isPaused) {
+          Serial.println("音乐暂停");
+          noTone(BUZZER_PIN); // Stop current note
+          currentLedCommand.effectType = 3; // Fill with black (off)
+          currentLedCommand.color = strip.Color(0,0,0);
+        } else {
+          Serial.println("音乐继续");
+          // Optionally, resume LED effect here if it was paused
+        }
+        // Add a visual indicator for pause/play if desired
+        // For now, just print to serial
       }
     }
     vTaskDelay(pdMS_TO_TICKS(10));

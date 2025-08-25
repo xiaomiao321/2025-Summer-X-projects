@@ -4,5 +4,5 @@
 #include "Menu.h"
 
 void BuzzerMenu();
-
+bool detectDoubleClick();
 #endif
