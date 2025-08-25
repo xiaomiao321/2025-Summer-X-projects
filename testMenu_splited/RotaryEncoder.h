@@ -14,5 +14,6 @@ int readButton();
 
 // 获取按钮的当前去抖动状态 (HIGH: 未按下, LOW: 按下)
 int getButtonCurrentState(); // New function
+bool readButtonLongPress(); // New function for long press detection
 
 #endif

@@ -40,7 +40,9 @@ const MenuItem menuItems[] = {
     {"Performance", Performance},
     {"Temperature",Temperature},
     {"Animation",Animation},
-    {"Games", Games} 
+    {"Games", Games},
+    {"Countdown", Sound}, // Placeholder image
+    {"Stopwatch", snake}   // Changed placeholder image
 };
 const uint8_t MENU_ITEM_COUNT = sizeof(menuItems) / sizeof(menuItems[0]); // Number of menu items
 
@@ -143,12 +145,14 @@ void showMenu() {
         vTaskDelay(pdMS_TO_TICKS(50)); // Small delay to let the sound play
 
         switch (picture_flag) {
-            case 0: BuzzerMenu(); break;
-            case 1: weatherMenu(); break;
-            case 2: performanceMenu(); break;
-            case 3: DS18B20Menu(); break;
-            case 4: AnimationMenu();break;
-            case 5: GamesMenu(); break;
+            case 0: BuzzerMenu(); showMenuConfig(); break;
+            case 1: weatherMenu(); showMenuConfig(); break;
+            case 2: performanceMenu(); showMenuConfig(); break;
+            case 3: DS18B20Menu(); showMenuConfig(); break;
+            case 4: AnimationMenu(); showMenuConfig(); break;
+            case 5: GamesMenu(); showMenuConfig(); break;
+            case 6: CountdownMenu(); showMenuConfig(); break; // Changed function name
+            case 7: StopwatchMenu(); showMenuConfig(); break; // Changed function name
         }
     }
 }

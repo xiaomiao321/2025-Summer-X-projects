@@ -10,3 +10,7 @@ void showMenuConfig();
 void animateMenuTransition(const char *title, bool entering);
 void ui_run_easing(int16_t *current, int16_t target, uint8_t steps);
 float easeOutQuad(float t);
+
+// New function declarations for the menu items
+void CountdownMenu();
+void StopwatchMenu();

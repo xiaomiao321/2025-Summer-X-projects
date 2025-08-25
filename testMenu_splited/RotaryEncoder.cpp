@@ -1,4 +1,6 @@
 #include "RotaryEncoder.h"
+#include <TFT_eSPI.h>
+#include "Menu.h"
 
 // 旋转编码器引脚定义
 #define ENCODER_CLK 1  // CLK 引脚
@@ -18,6 +20,11 @@ static uint8_t lastEncoded = 0;      // 上次编码状态
 static int deltaSum = 0;             // 累积状态变化增量
 static unsigned long lastEncoderTime = 0;  // 上次编码器读取时间
 static const unsigned long encoderDebounce = 2;  // 编码器去抖动时间（毫秒）
+
+// Global variables for long press detection
+static unsigned long buttonPressStartTime = 0;
+static bool longPressTriggered = false;
+static const unsigned long longPressThreshold = 1000; // 1 second for long press
 
 // 初始化旋转编码器
 void initRotaryEncoder() {
@@ -105,3 +112,56 @@ int readButton() {
 int getButtonCurrentState() {
   return lastButtonState; // Return the debounced state maintained by readButton()
 }
+
+// New function for long press detection
+bool readButtonLongPress() {
+  int buttonState = digitalRead(ENCODER_SW);
+  bool triggered = false;
+
+  // Progress bar drawing variables
+  static const int BAR_X = 50;
+  static const int BAR_Y = 200;
+  static const int BAR_WIDTH = 140;
+  static const int BAR_HEIGHT = 10;
+  static const int TEXT_Y = BAR_Y - 20;
+
+  if (buttonState == LOW) { // Button is currently pressed
+    if (buttonPressStartTime == 0) { // First time detecting press
+      buttonPressStartTime = millis();
+      longPressTriggered = false; // Reset long press flag
+      // No initial clear here, let the timer display handle its own background
+    }
+
+    unsigned long currentHoldTime = millis() - buttonPressStartTime;
+    float progress = (float)currentHoldTime / longPressThreshold;
+    if (progress > 1.0) progress = 1.0; // Cap at 100%
+
+    // Draw progress bar directly on tft (main screen)
+    tft.fillRect(BAR_X, BAR_Y, BAR_WIDTH, BAR_HEIGHT, TFT_BLACK); // Clear bar area
+    tft.drawRect(BAR_X, BAR_Y, BAR_WIDTH, BAR_HEIGHT, TFT_WHITE); // Bar outline
+    tft.fillRect(BAR_X, BAR_Y, (int)(BAR_WIDTH * progress), BAR_HEIGHT, TFT_BLUE); // Filled progress
+
+    // Display "Release to Exit" text
+    tft.setTextFont(2);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.drawString("Release to Exit", tft.width() / 2, TEXT_Y);
+
+    // No pushSprite here, as we are drawing directly on tft
+
+    if (!longPressTriggered && (currentHoldTime >= longPressThreshold)) {
+      triggered = true;
+      longPressTriggered = true; // Prevent multiple triggers for one long press
+    }
+  } else { // Button is not pressed
+    // Clear progress bar and text when button is released
+    if (buttonPressStartTime != 0) { // Only clear if it was previously pressed
+      tft.fillRect(BAR_X - 5, TEXT_Y - 5, BAR_WIDTH + 10, BAR_HEIGHT + 30, TFT_BLACK); // Clear the entire area
+    }
+    buttonPressStartTime = 0; // Reset start time
+    longPressTriggered = false; // Reset long press flag
+  }
+
+  return triggered;
+}
+

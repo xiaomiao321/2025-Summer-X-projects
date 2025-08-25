@@ -5,6 +5,8 @@
 #include <WiFi.h>
 #include "Menu.h"
 #include "LED.h"
+#include "Countdown.h" // New include
+#include "Stopwatch.h" // New include
 // 全局变量
 TFT_eSPI tft = TFT_eSPI();         // TFT显示屏对象
 TFT_eSprite menuSprite = TFT_eSprite(&tft);
