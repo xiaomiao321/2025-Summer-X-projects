@@ -122,8 +122,6 @@ exit_task:
 void DS18B20Menu() {
   stopDS18B20Task = false;
 
-  animateMenuTransition("DS18B20", true);
-
   tft.fillScreen(TFT_BLACK);
 
   xTaskCreatePinnedToCore(DS18B20_Init_Task, "DS18B20_Init", 4096, NULL, 2, NULL, 0);
@@ -142,7 +140,6 @@ void DS18B20Menu() {
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 
-  animateMenuTransition("DS18B20", false);
   display = 48;
   picture_flag = 0;
   showMenuConfig();

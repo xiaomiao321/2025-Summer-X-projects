@@ -119,13 +119,12 @@ void Weather_Task(void *pvParameters) {
 // 天气菜单入口
 // -----------------------------
 void weatherMenu() {
-  animateMenuTransition("WEATHER",true);
+  drawWeatherStaticElements(); // Draw static elements directly
   xTaskCreatePinnedToCore(Weather_Init_Task, "Weather_Init", 8192, NULL, 2, NULL, 0);
   TaskHandle_t weatherTask = NULL;
   xTaskCreatePinnedToCore(Weather_Task, "Weather_Show", 8192, NULL, 1, &weatherTask, 0);
   while (1) {
     if (readButton()) {
-      animateMenuTransition("WEATHER",false);
       if (weatherTask != NULL) {
         vTaskDelete(weatherTask);
       }

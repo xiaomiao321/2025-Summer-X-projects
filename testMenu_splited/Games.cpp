@@ -144,7 +144,7 @@ void drawGameIcons(int16_t offset) {
 
 // --- Main Game Menu Function ---
 void GamesMenu() {
-    animateMenuTransition("GAMES", true);
+    tft.fillScreen(TFT_BLACK); // Clear screen directly
 
     // Reset state for the game menu
     game_picture_flag = 0;
@@ -179,7 +179,6 @@ void GamesMenu() {
         if (readButton()) { // Use readButton() directly
             if (gamesDetectDoubleClick()) { // Double click detected
                 gamesMenuSingleClickPending = false; // Cancel any pending single click
-                animateMenuTransition("GAMES", false);
                 display = 48; // Restore main menu state as in other files
                 picture_flag = 0;
                 showMenuConfig();
@@ -201,7 +200,7 @@ void GamesMenu() {
             if (gameItems[game_picture_flag].function) {
                 gameItems[game_picture_flag].function();
             }
-            animateMenuTransition("GAMES", true);
+            tft.fillScreen(TFT_BLACK); // Clear screen directly
             drawGameIcons(game_display);
         }
         vTaskDelay(pdMS_TO_TICKS(10));

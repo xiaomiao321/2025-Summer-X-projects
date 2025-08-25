@@ -288,14 +288,14 @@ void SERIAL_Task(void *pvParameters) {
 // 性能监控菜单入口
 // -----------------------------
 void performanceMenu() {
-  animateMenuTransition("PERFORMANCE",true);
+  tft.fillScreen(TFT_BLACK); // Clear screen directly
+  drawPerformanceStaticElements(); // Draw static elements
   xPCDataMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(Performance_Init_Task, "Perf_Init", 8192, NULL, 2, NULL, 0);
   xTaskCreatePinnedToCore(Performance_Task, "Perf_Show", 8192, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(SERIAL_Task, "Serial_Rx", 2048, NULL, 1, NULL, 0);
   while (1) {
     if (readButton()) {
-      animateMenuTransition("PERFORMANCE",false);
       vTaskDelete(xTaskGetHandle("Perf_Show"));
       vTaskDelete(xTaskGetHandle("Serial_Rx"));
       vSemaphoreDelete(xPCDataMutex);

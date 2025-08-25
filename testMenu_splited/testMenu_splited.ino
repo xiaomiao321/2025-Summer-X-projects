@@ -4,7 +4,7 @@
 #include <freertos/task.h>
 #include <WiFi.h>
 #include "Menu.h"
-
+#include "LED.h"
 // 全局变量
 TFT_eSPI tft = TFT_eSPI();         // TFT显示屏对象
 TFT_eSprite menuSprite = TFT_eSprite(&tft);
@@ -16,6 +16,7 @@ void setup() {
     menuSprite.createSprite(239, 239);
 
     tft.fillScreen(TFT_BLACK); // 清屏
+    strip.begin();
     showMenuConfig(); // 显示主菜单
 }
 

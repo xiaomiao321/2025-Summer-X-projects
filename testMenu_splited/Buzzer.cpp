@@ -2,6 +2,7 @@
 #include "RotaryEncoder.h"
 #include <TFT_eSPI.h>
 #include <time.h>
+#include "LED.h"
 
 
 // 音阶频率（Hz）
@@ -162,11 +163,65 @@ Song songs[] = {
 };
 const int numSongs = sizeof(songs) / sizeof(songs[0]);
 
-bool stopBuzzerTask = false;
+// Map frequency to a more distinct color for NeoPixel
+uint32_t mapFrequencyToColor(int frequency) {
+  if (frequency == 0) return strip.Color(0, 0, 0); // Rest note is off
+
+  // Define frequency bands and corresponding colors
+  // Frequencies are roughly 100-2000 Hz
+  if (frequency < 300) { // Low notes
+    return strip.Color(255, 0, 0); // Red
+  } else if (frequency < 600) { // Mid-low notes
+    return strip.Color(255, 128, 0); // Orange
+  } else if (frequency < 1000) { // Mid notes
+    return strip.Color(0, 255, 0); // Green
+  } else if (frequency < 1500) { // Mid-high notes
+    return strip.Color(0, 0, 255); // Blue
+  } else { // High notes
+    return strip.Color(128, 0, 255); // Purple
+  }
+}
+
+// LED effects (blocking versions, to be run in separate task)
+void colorWipe(uint32_t color, int wait) {
+  for (int i = 0; i < strip.numPixels(); i++) {
+    strip.setPixelColor(i, color);
+    strip.show();
+    vTaskDelay(pdMS_TO_TICKS(wait));
+  }
+}
+
+void rainbow(int wait) {
+  for (long firstPixelHue = 0; firstPixelHue < 3 * 65536; firstPixelHue += 256) {
+    for (int i = 0; i < strip.numPixels(); i++) {
+      int pixelHue = firstPixelHue + (i * 65536L / strip.numPixels());
+      strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue)));
+    }
+    strip.show();
+    vTaskDelay(pdMS_TO_TICKS(wait));
+  }
+}
+
+bool stopBuzzerTask = false; // Moved declaration to here
+
+// LED effects from LED.cpp, adapted for Buzzer.cpp
+
+
 int selectedSongIndex = 0;
 int displayOffset = 0; // 滚动偏移
 const int visibleSongs = 3; // 屏幕可见歌曲数
 bool firstDraw = true; // 全局绘制标志
+
+// Communication struct for LED Task
+typedef struct {
+  int effectType; // 0: None, 1: ColorWipe, 2: Rainbow, 3: FillColor
+  uint32_t color;
+  int frequency; // For frequency-based effects
+} LedEffectCommand;
+
+LedEffectCommand currentLedCommand = {0, 0, 0}; // Initialize with no effect
+bool stopLedTask = false; // Flag to stop Led_Task
+TaskHandle_t ledTaskHandle = NULL; // Handle for Led_Task
 
 // 计算歌曲总时长（秒）
 float calculateSongDuration(Song* song) {
@@ -316,6 +371,30 @@ void Buzzer_Init_Task(void *pvParameters) {
   vTaskDelete(NULL);
 }
 
+// LED Animation Task
+void Led_Task(void *pvParameters) {
+  for (;;) {
+    if (stopLedTask) { // Check stop flag
+      strip.clear();
+      strip.show();
+      vTaskDelete(NULL); // Delete task
+    }
+    // Check if there's a new command
+    if (currentLedCommand.effectType != 0) {
+      if (currentLedCommand.effectType == 1) { // ColorWipe
+        colorWipe(currentLedCommand.color, 10); // Run colorWipe
+      } else if (currentLedCommand.effectType == 2) { // Rainbow
+        rainbow(10); // Run rainbow
+      } else if (currentLedCommand.effectType == 3) { // FillColor
+        strip.fill(currentLedCommand.color);
+        strip.show();
+      }
+      currentLedCommand.effectType = 0; // Reset command after execution
+    }
+    vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other tasks
+  }
+}
+
 // 蜂鸣器播放任务
 void Buzzer_Task(void *pvParameters) {
   int songIndex = *(int*)pvParameters;
@@ -323,6 +402,8 @@ void Buzzer_Task(void *pvParameters) {
   for (;;) {
     if (stopBuzzerTask) {
       noTone(BUZZER_PIN);
+      strip.clear(); // Clear LEDs on exit
+      strip.show();  // Turn off LEDs
       stopBuzzerTask = false;
       Serial.println("Buzzer_Task 被外部中断，已停止");
       firstDraw = true; // 重置绘制标志
@@ -331,20 +412,30 @@ void Buzzer_Task(void *pvParameters) {
     for (int i = 0; i < song->length; i++) {
       if (stopBuzzerTask) {
         noTone(BUZZER_PIN);
+        strip.clear(); // Clear LEDs on exit
+        strip.show();  // Turn off LEDs
         stopBuzzerTask = false;
         firstDraw = true;
         goto exit_loop;
       }
       tone(BUZZER_PIN, song->melody[i], song->durations[i]);
+      // Send command to Led_Task
+      currentLedCommand.effectType = (i % 2 == 0) ? 1 : 2; // Alternate colorWipe and rainbow
+      currentLedCommand.color = mapFrequencyToColor(song->melody[i]);
+      currentLedCommand.frequency = song->melody[i];
+      
       displayPlayingSong(songIndex, i, song->length, song->melody[i]);
       vTaskDelay(pdMS_TO_TICKS(song->durations[i] * 1.3));
       noTone(BUZZER_PIN);
+      // Led_Task will handle clearing the strip after the effect
     }
     Serial.printf("%s 一轮播放完成\n", song->name);
     vTaskDelay(pdMS_TO_TICKS(2000));
     firstDraw = true; // 重置绘制标志
   }
 exit_loop:
+  strip.clear(); // Ensure LEDs are off when task deletes itself
+  strip.show();
   vTaskDelete(NULL);
 }
 
@@ -367,14 +458,15 @@ void BuzzerMenu() {
   tft.fillScreen(TFT_BLACK);
   initRotaryEncoder();
   initInternalRTC(); // 初始化内部 RTC
+  strip.show();  // Initialize all pixels to 'off'
   stopBuzzerTask = false;
+  stopLedTask = false; // Reset LED task stop flag
   selectedSongIndex = 0;
   displayOffset = 0;
   firstDraw = true; // 初始化绘制标志
 
   // 歌曲选择循环
 select_song:
-  animateMenuTransition("BUZZER", true);
   displaySongList(selectedSongIndex);
 
   while (1) {
@@ -394,7 +486,11 @@ select_song:
     if (readButton()) {
       if (detectDoubleClick()) { // 双击返回主菜单
         Serial.println("双击检测到，返回主菜单");
-        animateMenuTransition("BUZZER", false);
+        stopLedTask = true; // Signal Led_Task to stop
+        TaskHandle_t taskHandle = xTaskGetHandle("Led_Task");
+        if (taskHandle != NULL) {
+          vTaskDelete(taskHandle); // Delete Led_Task
+        }
         display = 48;
         picture_flag = 0;
         showMenuConfig();
@@ -410,6 +506,7 @@ select_song:
   // 启动播放任务
   xTaskCreatePinnedToCore(Buzzer_Init_Task, "Buzzer_Init", 8192, NULL, 2, NULL, 0);
   xTaskCreatePinnedToCore(Buzzer_Task, "Buzzer_Task", 8192, &selectedSongIndex, 1, NULL, 0);
+  xTaskCreatePinnedToCore(Led_Task, "Led_Task", 4096, NULL, 1, NULL, 0); // Start LED task
 
   // 播放控制循环
   while (1) {
@@ -428,7 +525,6 @@ select_song:
         if (initHandle != NULL) {
           vTaskDelete(initHandle);
         }
-        animateMenuTransition(songs[selectedSongIndex].name, false);
         display = 48;
         picture_flag = 0;
         showMenuConfig();
@@ -436,12 +532,17 @@ select_song:
       } else { // 单击返回歌曲选择
         Serial.println("单击检测到，返回歌曲选择");
         stopBuzzerTask = true;
-        TaskHandle_t taskHandle = xTaskGetHandle("Buzzer_Task");
-        if (taskHandle != NULL) {
+        stopLedTask = true; // Signal Led_Task to stop
+        TaskHandle_t buzzerTaskHandle = xTaskGetHandle("Buzzer_Task");
+        if (buzzerTaskHandle != NULL) {
           const TickType_t xTimeout = pdMS_TO_TICKS(100);
-          while (eTaskGetState(taskHandle) != eDeleted && xTimeout > 0) {
+          while (eTaskGetState(buzzerTaskHandle) != eDeleted && xTimeout > 0) {
             vTaskDelay(pdMS_TO_TICKS(10));
           }
+        }
+        TaskHandle_t ledTaskHandle = xTaskGetHandle("Led_Task");
+        if (ledTaskHandle != NULL) {
+          vTaskDelete(ledTaskHandle); // Delete Led_Task
         }
         TaskHandle_t initHandle = xTaskGetHandle("Buzzer_Init");
         if (initHandle != NULL) {

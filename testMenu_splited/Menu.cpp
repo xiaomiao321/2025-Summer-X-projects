@@ -38,7 +38,6 @@ const MenuItem menuItems[] = {
     {"Music", Music},
     {"Weather", Weather},
     {"Performance", Performance},
-    {"LED",LED},
     {"Temperature",Temperature},
     {"Animation",Animation},
     {"Games", Games} 
@@ -75,7 +74,11 @@ void ui_run_easing(int16_t *current, int16_t target, uint8_t steps) {
 
 // Draw main menu
 void drawMenuIcons(int16_t offset) {
-    menuSprite.fillSprite(TFT_BLACK);
+    // Clear the region where icons and triangle are drawn
+    menuSprite.fillRect(0, ICON_Y_POS, SCREEN_WIDTH, SCREEN_HEIGHT - ICON_Y_POS, TFT_BLACK);
+
+    // Clear the text area at the top
+    menuSprite.fillRect(0, 0, SCREEN_WIDTH, 40, TFT_BLACK); // Clear from y=0 to y=40
 
     // Selection triangle indicator
     int16_t triangle_x = offset + (picture_flag * ICON_SPACING) + (ICON_SIZE / 2);
@@ -91,10 +94,9 @@ void drawMenuIcons(int16_t offset) {
 
     // Text
     menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-    menuSprite.setTextSize(1);
-    menuSprite.setTextDatum(TL_DATUM);
-    menuSprite.drawString("MENU:", 10, 10);
-    menuSprite.drawString(menuItems[picture_flag].name, 50, 10);
+    menuSprite.setTextSize(2); // Enlarge text
+    menuSprite.setTextDatum(TC_DATUM); // Center text horizontally
+    menuSprite.drawString(menuItems[picture_flag].name, SCREEN_WIDTH / 2, 10); // Centered menu item name
     
 
     menuSprite.pushSprite(0, 0);
@@ -106,48 +108,7 @@ void showMenuConfig() {
     drawMenuIcons(display);
 }
 
-// Animate transition (entering or exiting submenu)
-void animateMenuTransition(const char *title, bool entering) {
-    current_state = ANIMATING;
-    
-    int16_t start_y = entering ? 10 : 220;
-    int16_t target_y = entering ? 220 : 10;
-    int16_t animated_text_y = start_y;
 
-    for (uint8_t step = ANIMATION_STEPS; step > 0; step--) {
-        // Clear the sprite, not the screen
-        menuSprite.fillSprite(TFT_BLACK);
-
-        // Draw all elements to the sprite
-        // Icons
-        for (int i = 0; i < MENU_ITEM_COUNT; i++) {
-            int16_t x = display + (i * ICON_SPACING);
-            if (x >= -ICON_SIZE && x < SCREEN_WIDTH) {
-                menuSprite.pushImage(x, ICON_Y_POS, ICON_SIZE, ICON_SIZE, menuItems[i].image);
-            }
-        }
-
-        // Triangle
-        int16_t triangle_x = display + (picture_flag * ICON_SPACING) + ICON_SIZE / 2;
-        menuSprite.fillTriangle(triangle_x, TRIANGLE_BASE_Y, triangle_x - 12, TRIANGLE_PEAK_Y, triangle_x + 12, TRIANGLE_PEAK_Y, TFT_WHITE);
-
-        // Animated text
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-        menuSprite.setTextSize(1);
-        menuSprite.setTextDatum(TL_DATUM);
-        menuSprite.drawString("MENU:", 10, animated_text_y);
-        menuSprite.drawString(title, 50, animated_text_y);
-
-        ui_run_easing(&animated_text_y, target_y, step);
-        
-        // Push the completed sprite to the screen in one go
-        menuSprite.pushSprite(0, 0);
-
-        vTaskDelay(pdMS_TO_TICKS(15));
-    }
-
-    current_state = entering ? SUB_MENU : MAIN_MENU;
-}
 
 // Main menu navigation
 void showMenu() {
@@ -185,10 +146,9 @@ void showMenu() {
             case 0: BuzzerMenu(); break;
             case 1: weatherMenu(); break;
             case 2: performanceMenu(); break;
-            case 3: LEDMenu(); break;
-            case 4: DS18B20Menu(); break;
-            case 5: AnimationMenu();break;
-            case 6: GamesMenu(); break; // New case
+            case 3: DS18B20Menu(); break;
+            case 4: AnimationMenu();break;
+            case 5: GamesMenu(); break;
         }
     }
 }

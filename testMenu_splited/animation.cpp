@@ -56,11 +56,9 @@ void Animation_task(void *pvParameters)
 
 void AnimationMenu()
 {
-  animateMenuTransition("Animation", true);
   tft.fillScreen(TFT_BLACK);
   
   // Initialize NeoPixel strip
-  strip.begin(); // Use the global strip object
   strip.show(); // Initialize all pixels to 'off'
 
   stopAnimationTask = false; // Reset the flag
@@ -87,7 +85,6 @@ void AnimationMenu()
       // Wait for the task to delete itself
       vTaskDelay(pdMS_TO_TICKS(200)); 
 
-      animateMenuTransition("Animation",false);
       break;
     }
     vTaskDelay(pdMS_TO_TICKS(10));
