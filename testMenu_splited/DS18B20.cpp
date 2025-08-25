@@ -2,6 +2,20 @@
 #include <TFT_eSPI.h>
 #include <TFT_eWidget.h>
 
+// Graph dimensions and position
+#define TEMP_GRAPH_WIDTH  200
+#define TEMP_GRAPH_HEIGHT 135
+#define TEMP_GRAPH_X      20
+#define TEMP_GRAPH_Y      90 
+
+// Temperature display position
+#define TEMP_VALUE_X      20
+#define TEMP_VALUE_Y      20
+
+// Status message position
+#define STATUS_MESSAGE_X  10
+#define STATUS_MESSAGE_Y  230 // Adjust this to be below the graph
+
 #define DS18B20_PIN 10
 
 
@@ -26,21 +40,29 @@ void DS18B20_Task(void *pvParameters) {
   unsigned long timeout;
   float gx = 0.0;
 
-  gr.createGraph(100, 50, tft.color565(5, 5, 5));
-  gr.setGraphScale(0.0, 100.0, 0.0, 40.0);
-  gr.setGraphGrid(0.0, 50.0, 0.0, 20.0, TFT_DARKGREY);
-  gr.drawGraph(14, 75);
+  gr.createGraph(TEMP_GRAPH_WIDTH, TEMP_GRAPH_HEIGHT, tft.color565(5, 5, 5));
+  gr.setGraphScale(0.0, 100.0, 0.0, 40.0); // X-axis 0-100, Y-axis 0-40 (temperature range)
+  gr.setGraphGrid(0.0, 25.0, 0.0, 10.0, TFT_DARKGREY); // Grid every 25 on X, 10 on Y
+  gr.drawGraph(TEMP_GRAPH_X, TEMP_GRAPH_Y);
   tr.startTrace(TFT_YELLOW);
 
-  tft.setTextDatum(MR_DATUM);
-  tft.drawNumber(40, gr.getPointX(0.0) - 2, gr.getPointY(40.0));
-  tft.drawNumber(20, gr.getPointX(0.0) - 2, gr.getPointY(20.0));
-  tft.drawNumber(0, gr.getPointX(0.0) - 2, gr.getPointY(0.0));
+  // Draw Y-axis labels
+  tft.setTextSize(1); // Set text size for axis labels
+  tft.setTextDatum(MR_DATUM); // Middle-Right datum
+  tft.setTextColor(TFT_WHITE, tft.color565(5, 5, 5)); // Set text color for axis labels
+  tft.drawNumber(40, gr.getPointX(0.0) - 5, gr.getPointY(40.0));
+  tft.drawNumber(30, gr.getPointX(0.0) - 5, gr.getPointY(30.0));
+  tft.drawNumber(20, gr.getPointX(0.0) - 5, gr.getPointY(20.0));
+  tft.drawNumber(10, gr.getPointX(0.0) - 5, gr.getPointY(10.0));
+  tft.drawNumber(0, gr.getPointX(0.0) - 5, gr.getPointY(0.0));
 
-  tft.setTextDatum(TC_DATUM);
-  tft.drawNumber(0, gr.getPointX(0.0), gr.getPointY(0.0) + 2);
-  tft.drawNumber(50, gr.getPointX(50.0), gr.getPointY(0.0) + 2);
-  tft.drawNumber(100, gr.getPointX(100.0), gr.getPointY(0.0) + 2);
+  // Draw X-axis labels
+  tft.setTextDatum(TC_DATUM); // Top-Center datum
+  tft.drawNumber(0, gr.getPointX(0.0), gr.getPointY(0.0) + 5);
+  tft.drawNumber(25, gr.getPointX(25.0), gr.getPointY(0.0) + 5);
+  tft.drawNumber(50, gr.getPointX(50.0), gr.getPointY(0.0) + 5);
+  tft.drawNumber(75, gr.getPointX(75.0), gr.getPointY(0.0) + 5);
+  tft.drawNumber(100, gr.getPointX(100.0), gr.getPointY(0.0) + 5);
 
   while (1) {
     if (stopDS18B20Task) {
@@ -60,11 +82,11 @@ void DS18B20_Task(void *pvParameters) {
     float tempC = sensors.getTempCByIndex(0);
 
     if (tempC != DEVICE_DISCONNECTED_C && tempC > -50 && tempC < 150) {
-      tft.fillRect(0, 0, tft.width(), 60, TFT_BLACK);
+      tft.fillRect(0, 0, tft.width(), TEMP_GRAPH_Y - 5, TFT_BLACK); // Clear area above graph
       char tempStr[10];
       dtostrf(tempC, 4, 2, tempStr);
       tft.setTextSize(4);
-      tft.setCursor(20, 20);
+      tft.setCursor(TEMP_VALUE_X, TEMP_VALUE_Y);
       tft.print(tempStr);
       tft.print(" C");
 
@@ -75,37 +97,22 @@ void DS18B20_Task(void *pvParameters) {
 
       if (gx > 100.0) {
         gx = 0.0;
-        gr.drawGraph(14, 75);
+        gr.drawGraph(TEMP_GRAPH_X, TEMP_GRAPH_Y);
         tr.startTrace(TFT_YELLOW);
       }
 
-      tft.fillRect(0, 130, tft.width(), 20, TFT_BLACK);
-      tft.setTextSize(2);
-      if (tempC > 35) {
-        tft.setTextColor(TFT_RED);
-        tft.setCursor(10, 130);
-        tft.println("Too High");
-      } else if (tempC < 10) {
-        tft.setTextColor(TFT_BLUE);
-        tft.setCursor(10, 130);
-        tft.println("Too Low");
-      } else {
-        tft.setTextColor(TFT_GREEN);
-        tft.setCursor(10, 130);
-        tft.println("Normal");
-      }
       lastTemp = tempC;
     } else {
       if (stopDS18B20Task) break;
 
-      tft.fillRect(0, 0, tft.width(), 128, TFT_BLACK);
+      tft.fillRect(0, 0, tft.width(), tft.height(), TFT_BLACK); // Clear entire screen on error
       tft.setCursor(10, 30);
       tft.setTextSize(2);
       tft.setTextColor(TFT_RED);
       tft.println("Sensor Error!");
     }
 
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 
 exit_task:
