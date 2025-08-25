@@ -1,4 +1,4 @@
-#include "buzzer.h"
+#include "Buzzer.h"
 #include "RotaryEncoder.h"
 #include <TFT_eSPI.h>
 #include <time.h>

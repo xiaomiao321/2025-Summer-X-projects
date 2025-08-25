@@ -109,7 +109,8 @@ const GameItem gameItems[] = {
     {"Conway's Game", Conway, ConwayGame},
     {"Snake Game", snake, tanchisheGame},
     {"Buzzer Tap", Sound, BuzzerTapGame},
-    {"Time Challenge", Time, TimeChallengeGame},
+    {"Time Challenge", Timer, TimeChallengeGame},
+    {"Dino Game", Dinasor, dinoGame}, // Placeholder icon
 };
 const uint8_t GAME_ITEM_COUNT = sizeof(gameItems) / sizeof(gameItems[0]);
 
@@ -604,5 +605,136 @@ void TimeChallengeGame() {
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+// --- Dino Game Implementation ---
+#define DINO_GROUND_Y (SCREEN_HEIGHT - 40)
+#define DINO_X 40
+#define DINO_WIDTH 20
+#define DINO_HEIGHT 20
+#define JUMP_VELOCITY -8
+#define GRAVITY 0.5
+
+struct Obstacle {
+    int x;
+    int width;
+    int height;
+};
+
+void dinoGame() {
+    tft.fillScreen(TFT_BLACK);
+
+    float dino_y = DINO_GROUND_Y - DINO_HEIGHT;
+    float dino_vy = 0;
+    bool dino_is_jumping = false;
+    int dino_score = 0;
+    bool dino_game_over = false;
+    float game_speed = 4.0;
+
+    std::vector<Obstacle> obstacles;
+    unsigned long last_obstacle_time = 0;
+
+    while (true) {
+        // --- Input ---
+        if (readButton() && !dino_is_jumping) {
+            dino_is_jumping = true;
+            dino_vy = JUMP_VELOCITY;
+            tone(BUZZER_PIN, 1500, 50);
+        }
+        
+        if (readButton()) {
+            if (gamesDetectDoubleClick()) {
+                return; // Exit game
+            }
+        }
+
+        if (!dino_game_over) {
+            // --- Update ---
+            // Dino physics
+            if (dino_is_jumping) {
+                dino_y += dino_vy;
+                dino_vy += GRAVITY;
+                if (dino_y >= DINO_GROUND_Y - DINO_HEIGHT) {
+                    dino_y = DINO_GROUND_Y - DINO_HEIGHT;
+                    dino_is_jumping = false;
+                    dino_vy = 0;
+                }
+            }
+
+            // Obstacles
+            if (millis() - last_obstacle_time > random(1000, 3000) / (game_speed / 4.0)) {
+                obstacles.push_back({SCREEN_WIDTH, 15, 30});
+                last_obstacle_time = millis();
+            }
+
+            for (auto &obs : obstacles) {
+                obs.x -= game_speed;
+            }
+
+            // Remove off-screen obstacles and increase score
+            for (int i = 0; i < obstacles.size(); ++i) {
+                if (obstacles[i].x < -obstacles[i].width) {
+                    obstacles.erase(obstacles.begin() + i);
+                    dino_score++;
+                    game_speed += 0.1; // Increase speed
+                    i--;
+                }
+            }
+
+            // Collision detection
+            for (const auto &obs : obstacles) {
+                if (DINO_X + DINO_WIDTH > obs.x && DINO_X < obs.x + obs.width &&
+                    dino_y + DINO_HEIGHT > DINO_GROUND_Y - obs.height) {
+                    dino_game_over = true;
+                    tone(BUZZER_PIN, 500, 200);
+                }
+            }
+
+        } else {
+            // Game over state
+            if (readButton()) { // Press button to restart
+                dino_y = DINO_GROUND_Y - DINO_HEIGHT;
+                dino_vy = 0;
+                dino_is_jumping = false;
+                dino_score = 0;
+                dino_game_over = false;
+                game_speed = 4.0;
+                obstacles.clear();
+                last_obstacle_time = millis();
+            }
+        }
+
+        // --- Draw ---
+        tft.fillScreen(TFT_BLACK);
+
+        // Draw Ground
+        tft.drawLine(0, DINO_GROUND_Y, SCREEN_WIDTH, DINO_GROUND_Y, TFT_WHITE);
+
+        // Draw Dino
+        tft.fillRect(DINO_X, dino_y, DINO_WIDTH, DINO_HEIGHT, TFT_GREEN);
+
+        // Draw Obstacles
+        for (const auto &obs : obstacles) {
+            tft.fillRect(obs.x, DINO_GROUND_Y - obs.height, obs.width, obs.height, TFT_RED);
+        }
+
+        // Draw Score
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(1);
+        tft.setCursor(10, 10);
+        tft.printf("Score: %d", dino_score);
+
+        if (dino_game_over) {
+            tft.setTextColor(TFT_RED, TFT_BLACK);
+            tft.setTextSize(2);
+            tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("GAME OVER") / 2, SCREEN_HEIGHT / 2 - 10);
+            tft.print("GAME OVER");
+            tft.setTextSize(1);
+            tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("Press to restart") / 2, SCREEN_HEIGHT / 2 + 20);
+            tft.print("Press to restart");
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }

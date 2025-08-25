@@ -21,16 +21,23 @@ static int clickCount = 0;
 static const unsigned long doubleClickTimeWindow = 300; // milliseconds
 
 // Function to display the countdown time
-void displayCountdownTime(long seconds_left) {
+void displayCountdownTime(unsigned long millis_left) {
     menuSprite.fillScreen(TFT_BLACK); // Use menuSprite
     menuSprite.setTextFont(4); // Large font
     menuSprite.setTextDatum(MC_DATUM); // Middle center alignment
 
     char buf[20];
-    long minutes = seconds_left / 60;
-    long seconds = seconds_left % 60;
+    unsigned long total_seconds = millis_left / 1000;
+    long minutes = total_seconds / 60;
+    long seconds = total_seconds % 60;
+    long hundredths = (millis_left % 1000) / 10; // Display hundredths
 
-    sprintf(buf, "%02ld:%02ld", minutes, seconds); // Only minutes and seconds
+    // When setting the time, we don't want to show hundredths
+    if (!countdown_running && !countdown_paused) {
+        sprintf(buf, "%02ld:%02ld", minutes, seconds);
+    } else {
+        sprintf(buf, "%02ld:%02ld.%02ld", minutes, seconds, hundredths);
+    }
     menuSprite.drawString(buf, menuSprite.width() / 2, menuSprite.height() / 2 - 20);
 
     // Display status
@@ -40,7 +47,7 @@ void displayCountdownTime(long seconds_left) {
         menuSprite.drawString("RUNNING", menuSprite.width() / 2, menuSprite.height() - 20);
     } else if (countdown_paused) {
         menuSprite.drawString("PAUSED", menuSprite.width() / 2, menuSprite.height() - 20);
-    } else if (seconds_left == 0 && !countdown_running && !countdown_paused) {
+    } else if (millis_left == 0 && !countdown_running && !countdown_paused) {
         menuSprite.drawString("FINISHED", menuSprite.width() / 2, menuSprite.height() - 20);
     }
     else {
@@ -57,11 +64,11 @@ void displayCountdownTime(long seconds_left) {
     int bar_x = 20;
     int bar_y = menuSprite.height() / 2 + 40;
     int bar_width = menuSprite.width() - 40;
-    int bar_height = 10;
+    int bar_height = 20; // Made the progress bar wider
 
     float progress = 0.0;
     if (countdown_duration_seconds > 0) {
-        progress = 1.0 - (float)seconds_left / countdown_duration_seconds; // Calculate progress (0 to 1)
+        progress = 1.0 - (float)millis_left / (countdown_duration_seconds * 1000); // Calculate progress based on millis
     }
 
     menuSprite.drawRect(bar_x, bar_y, bar_width, bar_height, TFT_WHITE); // Outline
@@ -77,7 +84,7 @@ void CountdownMenu() {
     countdown_paused = false;
     countdown_duration_seconds = 5 * 60; // Reset to default 5 minutes
     countdown_setting_mode = 0; // Start in minutes setting mode
-    displayCountdownTime(countdown_duration_seconds);
+    displayCountdownTime(countdown_duration_seconds * 1000);
 
     int encoder_value = 0;
     bool button_pressed = false;
@@ -90,6 +97,8 @@ void CountdownMenu() {
         // Exit condition using long press
         if (readButtonLongPress()) {
             tone(BUZZER_PIN, 1500, 100); // Exit sound
+            menuSprite.fillScreen(TFT_BLACK); // Clear the screen
+            menuSprite.pushSprite(0, 0);
             return; // Exit the CountdownMenu function
         }
 
@@ -116,7 +125,7 @@ void CountdownMenu() {
                     countdown_duration_seconds = (current_minutes * 60) + current_seconds;
                 }
                 if (countdown_duration_seconds < 0) countdown_duration_seconds = 0;
-                displayCountdownTime(countdown_duration_seconds);
+                displayCountdownTime(countdown_duration_seconds * 1000);
                 tone(BUZZER_PIN, 1000, 20); // Feedback
             }
         }
@@ -137,13 +146,13 @@ void CountdownMenu() {
                 clickCount = 0; // Reset for next double-click
                 if (!countdown_running && !countdown_paused) { // Only toggle setting mode if not running/paused
                     countdown_setting_mode = 1 - countdown_setting_mode; // Toggle between 0 (minutes) and 1 (seconds)
-                    displayCountdownTime(countdown_duration_seconds); // Update display to show mode
+                    displayCountdownTime(countdown_duration_seconds * 1000); // Update display to show mode
                 }
             } else { // Single click (or first click of a potential double-click)
                 if (!countdown_running && !countdown_paused) { // Timer is READY or FINISHED
                     if (countdown_duration_seconds == 0) { // If finished, reset
                         countdown_duration_seconds = 5 * 60; // Reset to default
-                        displayCountdownTime(countdown_duration_seconds);
+                        displayCountdownTime(countdown_duration_seconds * 1000);
                     } else { // Timer is READY and duration > 0, so start countdown
                         countdown_start_millis = millis();
                         countdown_target_millis = countdown_start_millis + (countdown_duration_seconds * 1000);
@@ -160,7 +169,10 @@ void CountdownMenu() {
                     countdown_running = true;
                     countdown_paused = false;
                 }
-                displayCountdownTime((countdown_target_millis - millis()) / 1000); // Update display immediately
+                unsigned long current_millis = millis();
+                long millis_left = countdown_target_millis - current_millis;
+                if(millis_left < 0) millis_left = 0;
+                displayCountdownTime(millis_left); // Update display immediately
             }
         }
 
@@ -172,20 +184,21 @@ void CountdownMenu() {
         // Update countdown if running
         if (countdown_running) {
             unsigned long current_millis = millis();
-            long seconds_left = (countdown_target_millis - current_millis) / 1000;
+            long millis_left = countdown_target_millis - current_millis;
 
-            if (seconds_left < 0) seconds_left = 0; // Ensure it doesn't go negative
+            if (millis_left < 0) millis_left = 0;
 
-            if (seconds_left != (last_display_update_time - countdown_start_millis) / 1000) { // Only update if second changes
-                displayCountdownTime(seconds_left);
+            // Update every hundredth of a second
+            if (millis_left / 10 != (countdown_target_millis - last_display_update_time) / 10) {
+                displayCountdownTime(millis_left);
                 last_display_update_time = current_millis;
             }
 
-            if (seconds_left == 0) {
+            if (millis_left == 0) {
                 countdown_running = false;
                 countdown_paused = false;
                 tone(BUZZER_PIN, 500, 1000); // Alarm sound
-                displayCountdownTime(0); // Display 00:00
+                displayCountdownTime(0); // Display 00:00.00
                 // No automatic exit, stays on 00:00 until button press to reset
             }
         }

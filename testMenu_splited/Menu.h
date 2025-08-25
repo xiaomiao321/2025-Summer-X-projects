@@ -14,3 +14,4 @@ float easeOutQuad(float t);
 // New function declarations for the menu items
 void CountdownMenu();
 void StopwatchMenu();
+void ADCMenu();

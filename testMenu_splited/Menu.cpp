@@ -8,7 +8,7 @@
 #include "DS18B20.h"
 #include "animation.h"
 #include "Games.h" 
-
+#include "ADC.h"
 // --- Layout Configuration ---
 // Change these values to adjust the menu layout
 static const int ICON_SIZE = 200;     // The size for the icons (e.g., 180x180)
@@ -36,13 +36,14 @@ struct MenuItem {
 // Menu items array
 const MenuItem menuItems[] = {
     {"Music", Music},
-    {"Weather", Weather},
+    {"Clock", Weather},
     {"Performance", Performance},
     {"Temperature",Temperature},
     {"Animation",Animation},
     {"Games", Games},
-    {"Countdown", Sound}, // Placeholder image
-    {"Stopwatch", snake}   // Changed placeholder image
+    {"Countdown", Countdown}, // Placeholder image
+    {"Stopwatch", Timer},   // Changed placeholder image
+    {"ADC", ADC}      // Added ADC Voltmeter
 };
 const uint8_t MENU_ITEM_COUNT = sizeof(menuItems) / sizeof(menuItems[0]); // Number of menu items
 
@@ -153,6 +154,7 @@ void showMenu() {
             case 5: GamesMenu(); showMenuConfig(); break;
             case 6: CountdownMenu(); showMenuConfig(); break; // Changed function name
             case 7: StopwatchMenu(); showMenuConfig(); break; // Changed function name
+            case 8: ADCMenu(); showMenuConfig(); break;
         }
     }
 }

@@ -7,6 +7,10 @@
 #include "LED.h"
 #include "Countdown.h" // New include
 #include "Stopwatch.h" // New include
+#include "ADC.h" // New include
+// Forward declaration for ADC setup function
+void setupADC();
+
 // 全局变量
 TFT_eSPI tft = TFT_eSPI();         // TFT显示屏对象
 TFT_eSprite menuSprite = TFT_eSprite(&tft);
@@ -14,6 +18,8 @@ void setup() {
     initRotaryEncoder(); // 初始化旋转编码器
     tft.init(); // 初始化TFT显示屏
     tft.setRotation(1); // 设置屏幕旋转方向
+
+    setupADC(); // Initialize ADC
 
     menuSprite.createSprite(239, 239);
 
