@@ -5,7 +5,10 @@
 #include <TFT_eSPI.h>
 #include <time.h>
 #include "Menu.h"
-// TFT 布局（128x128 屏幕）
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+// TFT 布局
 #define DATA_X 3
 #define DATA_Y 24
 #define LINE_HEIGHT 16
@@ -15,18 +18,19 @@
 #define VALUE_COLOR TFT_CYAN
 #define ERROR_COLOR TFT_RED
 
-// extern struct tm timeinfo;
-// extern String weather_main;
-// extern String weather_temp;
-// extern String weather_hum;
-// extern bool wifi_connected;
-// extern unsigned long last_weather_update;
-// extern unsigned long last_time_update;
-// extern int last_sec;
+struct WeatherData {
+  String province;
+  String city;
+  String weather;
+  String temperature;
+  String humidity;
+  String reporttime;
+  bool valid = false;
+};
+
+extern WeatherData weatherData;
+extern bool wifi_connected;
 
 void weatherMenu();
-bool connectWiFi();
-void disconnectWiFi();
-void showWiFiStatus(bool connected);
 
 #endif
