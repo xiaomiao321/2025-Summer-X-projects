@@ -18,7 +18,18 @@
 
 extern bool wifi_connected;
 extern struct tm timeinfo; // Global timeinfo for watchfaces
+extern char temperature[10];
+extern char humidity[10];
+extern char reporttime[25];
+extern char lastSyncTimeStr[20]; // To display last sync time
 
 void weatherMenu();
+void syncTime();
+bool connectWiFi();
+bool fetchWeather();
+
+// Silent versions for background updates
+void silentSyncTime();
+void silentFetchWeather();
 
 #endif
