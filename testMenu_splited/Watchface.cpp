@@ -221,12 +221,12 @@ static void VectorScanWatchface() {
 
     // Hour, Minute, Second tickers
     tickers[0] = {start_x, y_main, num_w, num_h, 0, 2, false, 0};
-    tickers[1] = {start_x + num_w, y_main, num_w, num_h, 0, 9, false, 0};
+    tickers[1] = {start_x + num_w+5, y_main, num_w, num_h, 0, 9, false, 0};
     tickers[2] = {start_x + num_w*2 + colon_w + 20, y_main, num_w, num_h, 0, 5, false, 0}; // Shifted right
-    tickers[3] = {start_x + num_w*3 + colon_w + 20, y_main, num_w, num_h, 0, 9, false, 0}; // Shifted right
+    tickers[3] = {start_x + num_w*3 + colon_w + 20+5, y_main, num_w, num_h, 0, 9, false, 0}; // Shifted right
     // Seconds are now smaller and below minutes
     int sec_num_w = 20, sec_num_h = 25;
-    int sec_x_offset = tickers[3].x + num_w + 5; // Right of last minute digit
+    int sec_x_offset = tickers[3].x + num_w + 5; // Right of last minute digit, slightly back
     int sec_y_offset = y_main + num_h - sec_num_h + 5; // Below minutes
 
     tickers[4] = {sec_x_offset, sec_y_offset, sec_num_w, sec_num_h, 0, 5, false, 0};
@@ -272,9 +272,9 @@ static void VectorScanWatchface() {
 
         // Draw blinking colon between HH and MM
         if (millis() % 1000 < 500) {
-            menuSprite.setTextSize(3); // Smaller colon
+            menuSprite.setTextSize(4); // Smaller colon
             menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-            menuSprite.drawString(":", start_x + num_w*2 + 5, y_main + 5); // Adjusted position
+            menuSprite.drawString(":", start_x + num_w*2 + 10, y_main + 5); // Adjusted position
         }
 
         menuSprite.pushSprite(0,0);

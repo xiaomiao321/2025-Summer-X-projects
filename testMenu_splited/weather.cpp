@@ -9,7 +9,7 @@
 #include "Watchface.h" // Include Watchface menu
 
 // WiFi & Time
-const char* ssid     = "xiaomiao_hotspot"; // 你的WiFi名称
+const char* ssid     = "xiaomiao"; // 你的WiFi名称
 const char* password = "xiaomiao123";      // 你的WiFi密码
 const char* ntpServer = "ntp.aliyun.com";
 const long GMT_OFFSET_SEC = 8 * 3600;
@@ -47,29 +47,28 @@ bool connectWiFi() {
 
     WiFi.begin(ssid, password);
     
-    for (int attempts = 1; attempts <= 10; attempts++) { // Loop for 10 attempts
-        tft.fillRect(0, 120, tft.width(), 40, BG_COLOR); // Clear previous attempt info
-        tft.setTextSize(1);
-        tft.drawString("Attempt " + String(attempts) + "/10", 120, 120);
-
-        // Outer progress bar for attempts
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 10) { // 10 attempts
         tft.drawRect(20, 120, 202, 17, TFT_WHITE);
-        tft.fillRect(21, 122, attempts * 20, 13, TFT_GREEN);
+        tft.fillRect(21, 122, attempts * 20, 13, TFT_GREEN); // 20px per attempt
+        
+        tft.drawRect(20, 150, 202, 10, TFT_WHITE);
+        tft.fillRect(22, 152, 200, 6, BG_COLOR);
 
         unsigned long start = millis();
-        while(millis() - start < 2500) { // 2.5 seconds timeout per attempt
-            if (WiFi.status() == WL_CONNECTED) break; // Break inner loop if connected
+        while(millis() - start < 2500) { // 2.5 seconds timeout
+            if (WiFi.status() == WL_CONNECTED) break;
             float progress = (float)(millis() - start) / 2500.0;
-            tft.drawRect(20, 150, 202, 10, TFT_WHITE);
             tft.fillRect(22, 152, (int)(200 * progress), 6, TFT_BLUE);
             delay(50);
         }
         
-        if (WiFi.status() == WL_CONNECTED) break; // Break outer loop if connected
-        delay(500); // Short delay before next attempt
+        if (WiFi.status() == WL_CONNECTED) break;
+        attempts++;
     }
 
     if (WiFi.status() == WL_CONNECTED) {
+        tft.fillRect(21, 122, 200, 13, TFT_GREEN);
         Serial.println(" CONNECTED");
         tft.fillScreen(BG_COLOR);
         tft.setTextSize(2);
@@ -89,7 +88,6 @@ bool connectWiFi() {
         return false;
     }
 }
-
 void syncTime() {
     if (!wifi_connected) return;
     tft.fillScreen(BG_COLOR);

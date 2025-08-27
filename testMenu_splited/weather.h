@@ -5,8 +5,6 @@
 #include <TFT_eSPI.h>
 #include <time.h>
 #include "Menu.h"
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
 
 // TFT 布局
 #define DATA_X 3
@@ -18,19 +16,8 @@
 #define VALUE_COLOR TFT_CYAN
 #define ERROR_COLOR TFT_RED
 
-struct WeatherData {
-  String province;
-  String city;
-  String weather;
-  String temperature;
-  String humidity;
-  String reporttime;
-  bool valid = false;
-};
-
-extern WeatherData weatherData;
 extern bool wifi_connected;
-extern struct tm timeinfo; // ADDED: Global timeinfo for watchfaces
+extern struct tm timeinfo; // Global timeinfo for watchfaces
 
 void weatherMenu();
 
