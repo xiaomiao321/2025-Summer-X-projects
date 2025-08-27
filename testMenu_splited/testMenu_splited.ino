@@ -3,11 +3,21 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <WiFi.h>
+
+// All menu headers
 #include "Menu.h"
 #include "LED.h"
-#include "Countdown.h" // New include
-#include "Stopwatch.h" // New include
-#include "ADC.h" // New include
+#include "Buzzer.h"
+#include "weather.h"
+#include "performance.h"
+#include "DS18B20.h"
+#include "animation.h"
+#include "Games.h"
+#include "Countdown.h"
+#include "Stopwatch.h"
+#include "ADC.h"
+#include "Watchface.h"
+
 // Forward declaration for ADC setup function
 void setupADC();
 

@@ -613,8 +613,8 @@ void TimeChallengeGame() {
 #define DINO_X 40
 #define DINO_WIDTH 20
 #define DINO_HEIGHT 20
-#define JUMP_VELOCITY -8
-#define GRAVITY 0.5
+#define JUMP_VELOCITY -6
+#define GRAVITY 0.8
 
 struct Obstacle {
     int x;

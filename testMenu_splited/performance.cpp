@@ -303,7 +303,7 @@ void performanceMenu() {
     }
     vTaskDelay(pdMS_TO_TICKS(10));
   }
-  display = 48;
-  picture_flag = 0;
-  showMenuConfig();
+  // display = 48;
+  // picture_flag = 0;
+  // showMenuConfig();
 }

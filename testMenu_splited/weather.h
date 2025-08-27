@@ -30,6 +30,7 @@ struct WeatherData {
 
 extern WeatherData weatherData;
 extern bool wifi_connected;
+extern struct tm timeinfo; // ADDED: Global timeinfo for watchfaces
 
 void weatherMenu();
 
