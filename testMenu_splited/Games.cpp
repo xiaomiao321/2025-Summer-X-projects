@@ -62,44 +62,39 @@ void BuzzerTapGame();
 void TimeChallengeGame();
 void drawGameIcons(int16_t offset);
 
-// --- Button Debouncing and Single/Double Click Detection ---
-static int lastButtonState = HIGH; // HIGH = not pressed
+// --- Button Detection (Strictly copied from Buzzer.cpp) ---
+bool gamesDetectDoubleClick() {
+  static unsigned long lastClickTime = 0;
+  unsigned long currentTime = millis();
+  if (currentTime - lastClickTime < 500) { // 500ms 内两次点击
+    lastClickTime = 0;
+    return true;
+  }
+  lastClickTime = currentTime;
+  return false;
+}
+
+// --- Button Debouncing Variables ---
 static unsigned long lastButtonDebounceTime = 0;
+static int lastDebouncedButtonState = HIGH; // HIGH = not pressed, LOW = pressed
 const int BUTTON_DEBOUNCE_DELAY = 50; // ms
 
-// Function to get a debounced single button press event (returns true once per press)
-bool isButtonPressedOnce() {
+#define ENCODER_SW 25 // Button pin, copied from RotaryEncoder.cpp
+
+// Function to get debounced button state (true if button is currently pressed and debounced)
+bool getDebouncedButtonState() {
     int reading = digitalRead(ENCODER_SW); // Raw button read
 
-    // Debounce logic
-    if (reading != lastButtonState) {
+    if (reading != lastDebouncedButtonState) {
         lastButtonDebounceTime = millis();
     }
 
     if ((millis() - lastButtonDebounceTime) > BUTTON_DEBOUNCE_DELAY) {
-        if (reading != lastButtonState) { // State has settled
-            lastButtonState = reading;
-            if (lastButtonState == LOW) { // Button just became pressed
-                Serial.println("Single Button Press Detected!"); // DEBUG
-                return true; // Return true only once per press
-            }
+        if (reading != lastDebouncedButtonState) { // State has settled
+            lastDebouncedButtonState = reading;
         }
     }
-    return false; // No new press event
-}
-
-// Function to detect a double click event (should be called only when isButtonPressedOnce() is true)
-bool gamesDetectDoubleClick() {
-  static unsigned long lastClickTime = 0;
-  unsigned long currentTime = millis();
-  Serial.println("Potential Click for DoubleClick!"); // DEBUG
-  if (currentTime - lastClickTime < 500) { // 500ms 内两次点击
-    lastClickTime = 0; // Reset for next double click
-    Serial.println("Double Click Detected!"); // DEBUG
-    return true;
-  }
-  lastClickTime = currentTime; // Record time of first click
-  return false;
+    return (lastDebouncedButtonState == LOW); // Return true if button is pressed
 }
 
 // --- Menu Definition ---
@@ -150,15 +145,16 @@ void drawGameIcons(int16_t offset) {
 
 // --- Main Game Menu Function ---
 void GamesMenu() {
-    // Add pinMode for button here for testing
-    pinMode(ENCODER_SW, INPUT_PULLUP); // Ensure button pin is configured
-
     tft.fillScreen(TFT_BLACK); // Clear screen directly
 
     // Reset state for the game menu
     game_picture_flag = 0;
     game_display = INITIAL_X_OFFSET;
     drawGameIcons(game_display);
+
+    // State for delayed single-click in GamesMenu
+    static unsigned long gamesMenuLastClickTime = 0;
+    static bool gamesMenuSingleClickPending = false;
 
     while (true) {
         int direction = readEncoder();
@@ -181,23 +177,32 @@ void GamesMenu() {
             drawGameIcons(game_display);
         }
 
-        if (isButtonPressedOnce()) { // Check for any button press event
-            if (gamesDetectDoubleClick()) { // If it's a double click
-                Serial.println("GamesMenu: Double Click to Exit!"); // DEBUG
+        if (readButton()) { // Use readButton() directly
+            if (gamesDetectDoubleClick()) { // Double click detected
+                gamesMenuSingleClickPending = false; // Cancel any pending single click
                 display = 48; // Restore main menu state as in other files
                 picture_flag = 0;
                 showMenuConfig();
                 return; // Exit GamesMenu
-            } else { // It's a single click
-                Serial.println("GamesMenu: Single Click to Start Game!"); // DEBUG
-                tone(BUZZER_PIN, 2000, 50);
-                vTaskDelay(pdMS_TO_TICKS(50));
-                if (gameItems[game_picture_flag].function) {
-                    gameItems[game_picture_flag].function();
-                }
-                tft.fillScreen(TFT_BLACK); // Clear screen directly after game
-                drawGameIcons(game_display); // Redraw menu icons
+            } else {
+                // This is a single click (or the first click of a potential double click)
+                // Set flag and record time, then wait for DOUBLE_CLICK_WINDOW
+                gamesMenuLastClickTime = millis();
+                gamesMenuSingleClickPending = true;
             }
+        }
+
+        // Check if a pending single click should be executed
+        if (gamesMenuSingleClickPending && (millis() - gamesMenuLastClickTime > 500)) { // DOUBLE_CLICK_WINDOW
+            gamesMenuSingleClickPending = false; // Consume the pending single click
+            
+            tone(BUZZER_PIN, 2000, 50);
+            vTaskDelay(pdMS_TO_TICKS(50));
+            if (gameItems[game_picture_flag].function) {
+                gameItems[game_picture_flag].function();
+            }
+            tft.fillScreen(TFT_BLACK); // Clear screen directly
+            drawGameIcons(game_display);
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -294,11 +299,12 @@ void ConwayGame() {
         }
 
         // Button handling for exit
-        if (isButtonPressedOnce()) {
+        if (readButton()) { // Use readButton() directly
             if (gamesDetectDoubleClick()) { // Double click detected
                 return; // Exit
-            } 
-            // Single click has no effect in auto-run mode
+            } else {
+                // Single click has no effect in auto-run mode
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(10)); // Small delay for responsiveness
     }
@@ -313,13 +319,11 @@ void handleSnakeInput();
 void drawGameOver();
 
 void tanchisheGame() {
-  menuSprite.fillSprite(TFT_BLACK); // Clear sprite
-
   initSnakeGame(); // Initialize game state
 
-  menuSprite.drawRect(SNAKE_START_X - 1, SNAKE_START_Y - 1, SNAKE_GRID_WIDTH * SNAKE_CELL_SIZE + 2, SNAKE_GRID_HEIGHT * SNAKE_CELL_SIZE + 2, TFT_WHITE); // Draw border on sprite
-  drawSnake(); // Initial draw of the snake and food on sprite
-  menuSprite.pushSprite(0, 0); // Push initial state to screen
+  tft.fillScreen(TFT_BLACK); // Clear screen
+  tft.drawRect(SNAKE_START_X - 1, SNAKE_START_Y - 1, SNAKE_GRID_WIDTH * SNAKE_CELL_SIZE + 2, SNAKE_GRID_HEIGHT * SNAKE_CELL_SIZE + 2, TFT_WHITE); // Draw border
+  drawSnake(); // Initial draw of the snake and food
 
   unsigned long lastGameUpdateTime = millis();
 
@@ -333,22 +337,19 @@ void tanchisheGame() {
       updateSnake();
       drawSnake(); // Redraw only after snake state updates
       lastGameUpdateTime = currentTime;
-      menuSprite.pushSprite(0, 0); // Push updated sprite to screen
     }
 
     // Game over check and display
     if (gameOver) {
       drawGameOver();
-      menuSprite.pushSprite(0, 0); // Push game over screen
     }
 
     // Exit condition (double click)
-    if (isButtonPressedOnce()) {
-        if (gamesDetectDoubleClick()) {
-            return; // Exit game
-        }
+    if (readButton()) {
+      if (gamesDetectDoubleClick()) {
+        return; // Exit game
+      }
     }
-
     vTaskDelay(pdMS_TO_TICKS(10)); // Small delay for responsiveness
   }
 }
@@ -366,21 +367,22 @@ void initSnakeGame() {
 
 void drawSnake() {
   // This version clears the play area first, then redraws everything.
-  menuSprite.fillRect(SNAKE_START_X, SNAKE_START_Y, SNAKE_GRID_WIDTH * SNAKE_CELL_SIZE, SNAKE_GRID_HEIGHT * SNAKE_CELL_SIZE, TFT_BLACK);
+  // This is the simplest way to fix the "trail" bug.
+  tft.fillRect(SNAKE_START_X, SNAKE_START_Y, SNAKE_GRID_WIDTH * SNAKE_CELL_SIZE, SNAKE_GRID_HEIGHT * SNAKE_CELL_SIZE, TFT_BLACK);
 
   // Draw food (always redraw to ensure it's visible)
-  menuSprite.fillRect(SNAKE_START_X + food.x * SNAKE_CELL_SIZE, SNAKE_START_Y + food.y * SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, TFT_RED);
+  tft.fillRect(SNAKE_START_X + food.x * SNAKE_CELL_SIZE, SNAKE_START_Y + food.y * SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, TFT_RED);
 
   // Draw the entire snake body
   for (const auto& segment : snakeBody) {
-    menuSprite.fillRect(SNAKE_START_X + segment.x * SNAKE_CELL_SIZE, SNAKE_START_Y + segment.y * SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, TFT_GREEN);
+    tft.fillRect(SNAKE_START_X + segment.x * SNAKE_CELL_SIZE, SNAKE_START_Y + segment.y * SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, TFT_GREEN);
   }
 
   // Draw score
-  menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-  menuSprite.setTextSize(1);
-  menuSprite.setCursor(10, 10);
-  menuSprite.printf("Score: %d", snakeScore);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.setCursor(10, 10);
+  tft.printf("Score: %d", snakeScore);
 }
 
 void generateFood() {
@@ -456,13 +458,13 @@ void handleSnakeInput() {
 }
 
 void drawGameOver() {
-  menuSprite.setTextColor(TFT_RED, TFT_BLACK);
-  menuSprite.setTextSize(2);
-  menuSprite.setCursor(SCREEN_WIDTH / 2 - menuSprite.textWidth("GAME OVER") / 2, SCREEN_HEIGHT / 2 - 10);
-  menuSprite.print("GAME OVER");
-  menuSprite.setTextSize(1);
-  menuSprite.setCursor(SCREEN_WIDTH / 2 - menuSprite.textWidth("Score: ") / 2, SCREEN_HEIGHT / 2 + 10);
-  menuSprite.printf("Score: %d", snakeScore);
+  tft.setTextColor(TFT_RED, TFT_BLACK);
+  tft.setTextSize(2);
+  tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("GAME OVER") / 2, SCREEN_HEIGHT / 2 - 10);
+  tft.print("GAME OVER");
+  tft.setTextSize(1);
+  tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("Score: ") / 2, SCREEN_HEIGHT / 2 + 10);
+  tft.printf("Score: %d", snakeScore);
 }
 
 
@@ -498,7 +500,7 @@ void BuzzerTapGame() {
             nextToneInterval = random(1000, 3000); // New random interval
         }
 
-        if (isButtonPressedOnce()) {
+        if (readButton()) { // Use readButton() directly
             if (gamesDetectDoubleClick()) {
                 noTone(BUZZER_PIN); // Stop any ongoing tone
                 return; // Exit
@@ -546,6 +548,10 @@ void TimeChallengeGame() {
     tft.drawRect(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_WHITE); // Border for the bar
     tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Background fill
 
+    // Draw progress bar background
+    tft.drawRect(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_WHITE); // Border for the bar
+    tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Background fill
+
     unsigned long startTime = millis();
     unsigned long pressTime = 0;
     bool gameEnded = false;
@@ -573,9 +579,16 @@ void TimeChallengeGame() {
             // Clear previous progress and draw new progress
             tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Clear the filled part
             tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, filledWidth, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_COLOR); // Draw new filled part
+
+            
+            // Ensure filledWidth does not exceed PROGRESS_BAR_WIDTH
+            if (filledWidth > PROGRESS_BAR_WIDTH) {
+                filledWidth = PROGRESS_BAR_WIDTH;
+            }
+            
         }
 
-        if (isButtonPressedOnce()) {
+        if (readButton()) { // Use readButton() directly
             if (gamesDetectDoubleClick()) { // Double click detected
                 return; // Exit game
             } else { // Single click
@@ -610,7 +623,7 @@ struct Obstacle {
 };
 
 void dinoGame() {
-    menuSprite.fillSprite(TFT_BLACK); // Clear sprite
+    tft.fillScreen(TFT_BLACK);
 
     float dino_y = DINO_GROUND_Y - DINO_HEIGHT;
     float dino_vy = 0;
@@ -622,32 +635,17 @@ void dinoGame() {
     std::vector<Obstacle> obstacles;
     unsigned long last_obstacle_time = 0;
 
-    // Initial draw of static elements
-    menuSprite.drawLine(0, DINO_GROUND_Y, SCREEN_WIDTH, DINO_GROUND_Y, TFT_WHITE);
-    menuSprite.pushSprite(0, 0); // Push initial ground to screen
-
     while (true) {
         // --- Input ---
-        if (isButtonPressedOnce()) {
+        if (readButton() && !dino_is_jumping) {
+            dino_is_jumping = true;
+            dino_vy = JUMP_VELOCITY;
+            tone(BUZZER_PIN, 1500, 50);
+        }
+        
+        if (readButton()) {
             if (gamesDetectDoubleClick()) {
                 return; // Exit game
-            } else {
-                if (dino_game_over) { // Press button to restart
-                    dino_y = DINO_GROUND_Y - DINO_HEIGHT;
-                    dino_vy = 0;
-                    dino_is_jumping = false;
-                    dino_score = 0;
-                    dino_game_over = false;
-                    game_speed = 4.0;
-                    obstacles.clear();
-                    last_obstacle_time = millis();
-                    menuSprite.fillSprite(TFT_BLACK); // Clear sprite for new game
-                    menuSprite.drawLine(0, DINO_GROUND_Y, SCREEN_WIDTH, DINO_GROUND_Y, TFT_WHITE); // Redraw ground
-                } else if (!dino_is_jumping) {
-                    dino_is_jumping = true;
-                    dino_vy = JUMP_VELOCITY;
-                    tone(BUZZER_PIN, 1500, 50);
-                }
             }
         }
 
@@ -692,38 +690,51 @@ void dinoGame() {
                     tone(BUZZER_PIN, 500, 200);
                 }
             }
+
+        } else {
+            // Game over state
+            if (readButton()) { // Press button to restart
+                dino_y = DINO_GROUND_Y - DINO_HEIGHT;
+                dino_vy = 0;
+                dino_is_jumping = false;
+                dino_score = 0;
+                dino_game_over = false;
+                game_speed = 4.0;
+                obstacles.clear();
+                last_obstacle_time = millis();
+            }
         }
 
         // --- Draw ---
-        // Clear only moving parts on the sprite
-        menuSprite.fillRect(0, 0, SCREEN_WIDTH, DINO_GROUND_Y, TFT_BLACK); // Clear above ground
-        menuSprite.fillRect(0, DINO_GROUND_Y + 1, SCREEN_WIDTH, SCREEN_HEIGHT - (DINO_GROUND_Y + 1), TFT_BLACK); // Clear below ground (for game over text)
+        tft.fillScreen(TFT_BLACK);
+
+        // Draw Ground
+        tft.drawLine(0, DINO_GROUND_Y, SCREEN_WIDTH, DINO_GROUND_Y, TFT_WHITE);
 
         // Draw Dino
-        menuSprite.fillRect(DINO_X, dino_y, DINO_WIDTH, DINO_HEIGHT, TFT_GREEN);
+        tft.fillRect(DINO_X, dino_y, DINO_WIDTH, DINO_HEIGHT, TFT_GREEN);
 
         // Draw Obstacles
         for (const auto &obs : obstacles) {
-            menuSprite.fillRect(obs.x, DINO_GROUND_Y - obs.height, obs.width, obs.height, TFT_RED);
+            tft.fillRect(obs.x, DINO_GROUND_Y - obs.height, obs.width, obs.height, TFT_RED);
         }
 
         // Draw Score
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-        menuSprite.setTextSize(1);
-        menuSprite.setCursor(10, 10);
-        menuSprite.printf("Score: %d", dino_score);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(1);
+        tft.setCursor(10, 10);
+        tft.printf("Score: %d", dino_score);
 
         if (dino_game_over) {
-            menuSprite.setTextColor(TFT_RED, TFT_BLACK);
-            menuSprite.setTextSize(2);
-            menuSprite.setCursor(SCREEN_WIDTH / 2 - menuSprite.textWidth("GAME OVER") / 2, SCREEN_HEIGHT / 2 - 10);
-            menuSprite.print("GAME OVER");
-            menuSprite.setTextSize(1);
-            menuSprite.setCursor(SCREEN_WIDTH / 2 - menuSprite.textWidth("Press to restart") / 2, SCREEN_HEIGHT / 2 + 20);
-            menuSprite.print("Press to restart");
+            tft.setTextColor(TFT_RED, TFT_BLACK);
+            tft.setTextSize(2);
+            tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("GAME OVER") / 2, SCREEN_HEIGHT / 2 - 10);
+            tft.print("GAME OVER");
+            tft.setTextSize(1);
+            tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("Press to restart") / 2, SCREEN_HEIGHT / 2 + 20);
+            tft.print("Press to restart");
         }
-        
-        menuSprite.pushSprite(0, 0); // Push updated sprite to screen
+
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }

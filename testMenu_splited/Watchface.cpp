@@ -157,6 +157,7 @@ static void drawCommonElements() {
     String weatherStr = String(temperature) + " " + String(humidity);
     menuSprite.drawString(weatherStr, tft.width() - 15, 5);
     menuSprite.setTextSize(1);
+    menuSprite.setTextDatum(TL_DATUM);
     menuSprite.drawString(reporttime,5,5);
 
     // Date & Day of Week (Centered, two lines)
@@ -178,13 +179,13 @@ static void drawCommonElements() {
     menuSprite.setTextDatum(BC_DATUM);
     menuSprite.setTextSize(1);
     menuSprite.setTextColor(TFT_CYAN, TFT_BLACK);
-    menuSprite.drawString(lastSyncTimeStr, 20, tft.height() - 15);
+    menuSprite.drawString(lastSyncTimeStr, 120, tft.height() - 15);
 
     // Last Sync Weather
     menuSprite.setTextDatum(BC_DATUM);
-    menuSprite.setTextSize(2);
+    menuSprite.setTextSize(1);
     menuSprite.setTextColor(TFT_YELLOW, TFT_BLACK);
-    menuSprite.drawString(lastWeatherSyncStr, 5, 15);
+    menuSprite.drawString(lastWeatherSyncStr, 120, tft.height()-25);
 }
 
 // =================================================================================================

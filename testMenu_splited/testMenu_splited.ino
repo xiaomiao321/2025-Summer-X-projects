@@ -35,6 +35,7 @@ void setup() {
 
     tft.fillScreen(TFT_BLACK); // 清屏
     strip.begin();
+    strip.show();
     showMenuConfig(); // 显示主菜单
 }
 

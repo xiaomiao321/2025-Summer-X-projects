@@ -74,7 +74,7 @@ bool connectWiFi() {
     tft_log_y = 40;
 
     char log_buffer[100];
-    tftLog("=== WiFi Scan Start ===");
+    tftLog("========= WiFi Scan Start =========");
     Serial.println("\n=== WiFi Scan Start ===");
 
     // 先扫描所有可用的 WiFi 网络
@@ -97,7 +97,7 @@ bool connectWiFi() {
         Serial.printf("%d: %s (%d dBm) Ch%d\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i), WiFi.channel(i));
     }
     
-    if (n > 5) {
+    if (n > 10) {
         sprintf(log_buffer, "... and %d more", n - 10);
         tftLog(log_buffer);
         Serial.printf("... and %d more networks\n", n - 10);
@@ -109,7 +109,7 @@ bool connectWiFi() {
     tft.fillScreen(BG_COLOR);
     tft.setTextSize(2);
     tft.setTextDatum(MC_DATUM);
-    tft.drawCentreString("Connecting to WiFi...", tft.width()/2, 20,3);
+    tft.drawString("Connecting WiFi...",120, 20);
     tft_log_y = 40;
     
     sprintf(log_buffer, "SSID: %s", ssid);
@@ -203,7 +203,7 @@ bool connectWiFi() {
         attempts++;
     }
 
-    tftLog("=== Result ===");
+    tftLog("========= Result =========");
     Serial.println("\n=== Connection Result ===");
     
     sprintf(log_buffer, "Final status: %d", WiFi.status());
@@ -211,6 +211,8 @@ bool connectWiFi() {
     Serial.printf("Final WiFi Status: %d\n", WiFi.status());
 
     if (WiFi.status() == WL_CONNECTED) {
+        tft.fillScreen(BG_COLOR);
+        tft_log_y = 40;
         // 获取详细的网络信息
         tftLog("WiFi CONNECTED!");
         Serial.println("WiFi CONNECTED!");
@@ -244,15 +246,16 @@ bool connectWiFi() {
         
         // 显示成功界面
         tft.fillScreen(BG_COLOR);
-        tft.setTextSize(3);
-        tft.drawCentreString("WiFi Connected", tft.width()/2, 5,3);
-        tft.drawCentreString("IP: " + WiFi.localIP().toString(), tft.width()/2, 90,3);
-        tft.drawCentreString("Gateway: " + WiFi.gatewayIP().toString(), tft.width()/2, 130,3);
-        tft.drawCentreString("Signal: " + String(WiFi.RSSI()) + " dBm", tft.width()/2, 150,3);
+        tft.setTextSize(2);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString("WiFi Connected", tft.width()/2, 15);
+        tft.drawString("IP:" + WiFi.localIP().toString(), tft.width()/2, 85);
+        tft.drawString("Gateway:" + WiFi.gatewayIP().toString(), tft.width()/2, 155);
+        tft.drawString("Signal:" + String(WiFi.RSSI()) + " dBm", tft.width()/2, tft.height()-15);
         delay(2000);
         
         wifi_connected = true;
-        tftLog("=== WiFi Success ===");
+        tftLog("========= WiFi Success =========");
         Serial.println("=== WiFi Connection Successful ===");
         return true;
     } else {
@@ -288,6 +291,7 @@ bool connectWiFi() {
         // 显示失败界面
         tft.fillScreen(BG_COLOR);
         tft.setTextSize(2);
+        tft.setTextDatum(MC_DATUM);
         tft.drawString("WiFi Failed", 120, 60);
         tft.setTextSize(1);
         tft.drawString("Status: " + String(WiFi.status()), 120, 90);
@@ -295,7 +299,7 @@ bool connectWiFi() {
         tft.drawString("Attempts: " + String(attempts), 120, 130);
         
         wifi_connected = false;
-        tftLog("=== WiFi Failed ===");
+        tftLog("========= WiFi Failed =========");
         Serial.println("=== WiFi Connection Failed ===");
         delay(2000);
         return false;
@@ -323,7 +327,7 @@ void syncTime() {
     tft_log_y = 40;
 
     char log_buffer[100];
-    tftLog("=== NTP Time Sync Start ===");
+    tftLog("========= NTP Time Sync Start =========");
     Serial.println("\n=== NTP Time Sync Start ===");
 
     sprintf(log_buffer, "NTP Server: %s", ntpServer);
@@ -362,7 +366,7 @@ void syncTime() {
         attempts++;
     }
 
-    tftLog("=== Result ===");
+    tftLog("========= Result =========");
     Serial.println("\n=== Sync Result ===");
 
     if (synced) {
@@ -379,18 +383,19 @@ void syncTime() {
         delay(2000);
         tft.fillScreen(BG_COLOR);
         tft.setTextSize(3);
-        tft.drawCentreString("Time Synced", tft.width()/2, 5,3);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString("Time Synced", tft.width()/2, 15);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
         const char* weekDayStr[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
-        tft.drawCentreString(weekDayStr[timeinfo.tm_wday], tft.width()/2, 45,3); // Y=45
+        tft.drawString(weekDayStr[timeinfo.tm_wday], tft.width()/2, 45); // Y=45
         sprintf(time_str_buffer,"%d-%02d-%02d", timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday);
-        tft.drawCentreString(time_str_buffer, tft.width()/2, 75,3);
+        tft.drawString(time_str_buffer, tft.width()/2, 75);
 
         sprintf(time_str_buffer,"%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         tft.setTextSize(5);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.drawCentreString(time_str_buffer, tft.width()/2, tft.height()/2 + 20,5);
+        tft.drawString(time_str_buffer, tft.width()/2, tft.height()/2 + 20);
         delay(2000);
     } else {
         sprintf(lastSyncTimeStr, "Time Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
@@ -499,21 +504,23 @@ bool fetchWeather() {
     tft.setTextDatum(MC_DATUM);
     if (success) {
         tft.setTextColor(TFT_GREEN);
-        tft.drawCentreString("Weather Updated", tft.width()/2, 10,3);
-        tft.setTextSize(1);
-        
+        tft.setTextSize(3);
+        tft.drawString("Weather", tft.width()/2, 30);
+        tft.drawString("Updated", tft.width()/2, 60);
+        tft.setTextSize(2);
         snprintf(temperature, sizeof(temperature), "%sC", temperature_str.c_str());
         snprintf(humidity, sizeof(humidity), "%s%%", humidity_str.c_str());
         reporttime_str.toCharArray(reporttime, sizeof(reporttime)); 
         
-        tft.drawString("Temp: " + String(temperature), 60, 110);
-        tft.drawString("Humidity: " + String(humidity), 60, 130);
-        tft.drawString("ReportTime: " + reporttime_str, 60, 140);
+        tft.drawString("Temp: " + String(temperature), 120, 110);
+        tft.drawString("Humidity: " + String(humidity), 120, 130);
+        tft.drawString("ReportTime: " , 120, 150);
+        tft.drawString(reporttime_str,120,170);
     } else {
         tft.setTextColor(TFT_RED);
-        tft.drawString("Weather Failed", 60, 80);
-        tft.setTextSize(1);
-        tft.drawString(lastWeatherSyncStr, 60, 110);
+        tft.drawString("Weather Failed", 120, 80);
+        tft.setTextSize(2);
+        tft.drawString(lastWeatherSyncStr, 120, 110);
     }
     delay(2000);
     return success;
@@ -530,7 +537,7 @@ void silentSyncTime() {
 
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET, ntpServer);
     if (getLocalTime(&timeinfo, 10000)) {
-        strftime(lastSyncTimeStr, sizeof(lastSyncTimeStr), "OK at %H:%M:%S", &timeinfo);
+        strftime(lastSyncTimeStr, sizeof(lastSyncTimeStr), "Time Success at %H:%M:%S", &timeinfo);
         Serial.println("Silent time sync performed successfully.");
     }
  else {
