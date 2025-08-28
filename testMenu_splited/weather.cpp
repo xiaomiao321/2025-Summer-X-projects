@@ -22,7 +22,9 @@ bool wifi_connected = false;
 char temperature[10] = "N/A";
 char humidity[10] = "N/A";
 char reporttime[25] = "N/A";
-char lastSyncTimeStr[20] = "Never";
+char lastSyncTimeStr[45] = "Never";
+char lastWeatherSyncStr[45] = "Never";
+
 
 // UI Constants
 #define BG_COLOR TFT_BLACK
@@ -49,7 +51,7 @@ void tftLog(const String& text) {
     
     if (tft_log_y > tft.height() - 30) {
         tft_log_y = 40;
-        tft.fillRect(0, 30, tft.width(), tft.height() - 60, TFT_BLACK);
+        tft.fillRect(0, 30, tft.width(), tft.height() - 30, TFT_BLACK);
     }
     tft.drawString(text, 5, tft_log_y);
     tft_log_y += 10;
@@ -89,16 +91,16 @@ bool connectWiFi() {
     Serial.printf("Found %d networks:\n", n);
     
     // 显示扫描到的网络
-    for (int i = 0; i < n && i < 5; i++) { // 最多显示5个网络
+    for (int i = 0; i < n && i < 10; i++) { // 最多显示10个网络
         sprintf(log_buffer, "%d: %s (%ddBm)", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i));
         tftLog(log_buffer);
         Serial.printf("%d: %s (%d dBm) Ch%d\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i), WiFi.channel(i));
     }
     
     if (n > 5) {
-        sprintf(log_buffer, "... and %d more", n - 5);
+        sprintf(log_buffer, "... and %d more", n - 10);
         tftLog(log_buffer);
-        Serial.printf("... and %d more networks\n", n - 5);
+        Serial.printf("... and %d more networks\n", n - 10);
     }
     
     delay(2000);
@@ -107,7 +109,7 @@ bool connectWiFi() {
     tft.fillScreen(BG_COLOR);
     tft.setTextSize(2);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("Connecting to WiFi...", 120, 20);
+    tft.drawCentreString("Connecting to WiFi...", tft.width()/2, 20,3);
     tft_log_y = 40;
     
     sprintf(log_buffer, "SSID: %s", ssid);
@@ -242,12 +244,11 @@ bool connectWiFi() {
         
         // 显示成功界面
         tft.fillScreen(BG_COLOR);
-        tft.setTextSize(2);
-        tft.drawString("WiFi Connected", 120, 60);
-        tft.setTextSize(1);
-        tft.drawString("IP: " + WiFi.localIP().toString(), 120, 90);
-        tft.drawString("Gateway: " + WiFi.gatewayIP().toString(), 120, 110);
-        tft.drawString("Signal: " + String(WiFi.RSSI()) + " dBm", 120, 130);
+        tft.setTextSize(3);
+        tft.drawCentreString("WiFi Connected", tft.width()/2, 5,3);
+        tft.drawCentreString("IP: " + WiFi.localIP().toString(), tft.width()/2, 90,3);
+        tft.drawCentreString("Gateway: " + WiFi.gatewayIP().toString(), tft.width()/2, 130,3);
+        tft.drawCentreString("Signal: " + String(WiFi.RSSI()) + " dBm", tft.width()/2, 150,3);
         delay(2000);
         
         wifi_connected = true;
@@ -303,62 +304,102 @@ bool connectWiFi() {
 
 void syncTime() {
     if (!wifi_connected) {
-        Serial.println("WiFi not connected, using random time and setting RTC.");
-        strcpy(lastSyncTimeStr, "Never");
-        timeinfo.tm_year = 2024 - 1900;
-        timeinfo.tm_mon = random(12);
-        timeinfo.tm_mday = random(1, 29);
-        timeinfo.tm_hour = random(24);
-        timeinfo.tm_min = random(60);
-        timeinfo.tm_sec = random(60);
-        time_t t = mktime(&timeinfo);
-        struct timeval tv = { .tv_sec = t, .tv_usec = 0 };
-        settimeofday(&tv, NULL);
+        Serial.println("WiFi not connected, cannot sync time.");
+        strcpy(lastSyncTimeStr, "No WiFi");
+        tft.fillScreen(BG_COLOR);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextSize(2);
+        tft.drawString("WiFi Not Connected", 120, 80);
+        tft.setTextSize(1);
+        tft.drawString("Cannot sync time.", 120, 110);
+        delay(2000);
         return;
     }
 
     tft.fillScreen(BG_COLOR);
     tft.setTextSize(2);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("Syncing time...", 120, 60);
+    tft.drawString("Syncing Time...", 120, 20);
+    tft_log_y = 40;
+
+    char log_buffer[100];
+    tftLog("=== NTP Time Sync Start ===");
+    Serial.println("\n=== NTP Time Sync Start ===");
+
+    sprintf(log_buffer, "NTP Server: %s", ntpServer);
+    tftLog(log_buffer);
+    Serial.println(log_buffer);
+
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET, ntpServer);
+    tftLog("configTime() called.");
+    Serial.println("configTime() called.");
+
     int attempts = 0;
+    int max_attempts = 5;
     bool synced = false;
-    while (attempts < 5) {
-        tft.drawRect(20, 120, 202, 17, TFT_WHITE);
-        tft.fillRect(21, 122, attempts * 40, 13, TFT_GREEN);
+
+    while (attempts < max_attempts && !synced) {
+        tft.drawRect(20, tft.height() - 20, 202, 17, TFT_WHITE);
+        tft.fillRect(21, tft.height() - 18, (attempts + 1) * (200 / max_attempts), 13, TFT_GREEN);
+
+        sprintf(log_buffer, "Attempt %d/%d...", attempts + 1, max_attempts);
+        tftLog(log_buffer);
+        Serial.printf("\n--- Attempt %d/%d ---\n", attempts + 1, max_attempts);
+
         struct tm timeinfo_temp;
-        if (getLocalTime(&timeinfo_temp, 5000)) {
-            getLocalTime(&timeinfo);
-            strftime(lastSyncTimeStr, sizeof(lastSyncTimeStr), "Synced @%H:%M", &timeinfo);
+        tftLog("Calling getLocalTime()...");
+        Serial.println("Calling getLocalTime()...");
+        if (getLocalTime(&timeinfo_temp, 5000)) { // 5-second timeout
+            getLocalTime(&timeinfo); 
+            strftime(lastSyncTimeStr, sizeof(lastSyncTimeStr), "Time Success at %H:%M:%S", &timeinfo);
             synced = true;
-            break;
+            tftLog("SUCCESS: Time obtained!");
+            Serial.println("SUCCESS: Time obtained!");
+        } else {
+            tftLog("FAILED: getLocalTime() timeout.");
+            Serial.println("FAILED: getLocalTime() timeout.");
         }
         attempts++;
     }
 
+    tftLog("=== Result ===");
+    Serial.println("\n=== Sync Result ===");
+
     if (synced) {
-        tft.fillRect(21, 122, 200, 13, TFT_GREEN);
-        Serial.println("Time Synced");
-        printLocalTime();
+        tft.fillRect(21, tft.height() - 18, 200, 13, TFT_GREEN);
+        tftLog("Time Synced Successfully.");
+        Serial.println("Time Synced Successfully.");
+        
+        char time_str_buffer[50];
+        strftime(time_str_buffer, sizeof(time_str_buffer), "%A, %Y-%m-%d %H:%M:%S", &timeinfo);
+        sprintf(log_buffer, "Current Time: \n %s", time_str_buffer);
+        tftLog(log_buffer);
+        Serial.println(log_buffer);
+        
+        delay(2000);
         tft.fillScreen(BG_COLOR);
-        tft.drawString("Time Synced", 120, 80);
-        delay(1000);
+        tft.setTextSize(3);
+        tft.drawCentreString("Time Synced", tft.width()/2, 5,3);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        const char* weekDayStr[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+        tft.drawCentreString(weekDayStr[timeinfo.tm_wday], tft.width()/2, 45,3); // Y=45
+        sprintf(time_str_buffer,"%d-%02d-%02d", timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday);
+        tft.drawCentreString(time_str_buffer, tft.width()/2, 75,3);
+
+        sprintf(time_str_buffer,"%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        tft.setTextSize(5);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.drawCentreString(time_str_buffer, tft.width()/2, tft.height()/2 + 20,5);
+        delay(2000);
     } else {
-        strcpy(lastSyncTimeStr, "Failed");
-        Serial.println("NTP Sync FAILED, using random time and setting RTC.");
+        sprintf(lastSyncTimeStr, "Time Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        tftLog("NTP Sync FAILED.");
+        Serial.println("NTP Sync FAILED.");
+        delay(2000);
         tft.fillScreen(BG_COLOR);
         tft.drawString("NTP Sync Failed", 120, 80);
         delay(2000);
-        timeinfo.tm_year = 2024 - 1900;
-        timeinfo.tm_mon = random(12);
-        timeinfo.tm_mday = random(1, 29);
-        timeinfo.tm_hour = random(24);
-        timeinfo.tm_min = random(60);
-        timeinfo.tm_sec = random(60);
-        time_t t = mktime(&timeinfo);
-        struct timeval tv = { .tv_sec = t, .tv_usec = 0 };
-        settimeofday(&tv, NULL);
     }
 }
 
@@ -368,6 +409,7 @@ bool fetchWeather() {
     
     if (!wifi_connected) {
         Serial.println("DEBUG: fetchWeather() called, but wifi_connected is false.");
+        strcpy(lastWeatherSyncStr, "No WiFi");
         return false;
     }
 
@@ -375,8 +417,9 @@ bool fetchWeather() {
     tft.setTextSize(2);
     tft.setTextDatum(MC_DATUM);
     tft.drawString("Fetching Weather...", 120, 20);
-    tft_log_y = 40; // Reset log position
+    tft_log_y = 40;
 
+    strcpy(lastWeatherSyncStr, "Fetching...");
     tftLog("Attempting to fetch weather...");
     Serial.println("DEBUG: Attempting to fetch weather...");
     
@@ -385,13 +428,11 @@ bool fetchWeather() {
     String url = "http://restapi.amap.com/v3/weather/weatherInfo?city=" + String(CITY_CODE) + "&key=" + String(API_KEY);
     bool success = false;
 
-    // 使用 String 类型来存储温度湿度
     String temperature_str = "";
     String humidity_str = "";
     String reporttime_str = "";
 
     for (int i = 0; i < 5; i++) {
-        // 绘制进度条
         tft.drawRect(20, tft.height() - 20, 202, 17, TFT_WHITE);
         tft.fillRect(21, tft.height() - 18, (i + 1) * 40, 13, TFT_GREEN); 
 
@@ -399,7 +440,6 @@ bool fetchWeather() {
         sprintf(log_buffer, "Attempt %d/5...", i + 1);
         tftLog(log_buffer);
 
-        // 开始 HTTP 连接
         if (http.begin(client, url)) {
             http.setTimeout(15000);
             http.addHeader("User-Agent", "ESP32-Weather");
@@ -418,59 +458,62 @@ bool fetchWeather() {
                     success = true;
                     String payload = http.getString();
                     tftLog("HTTP Success!");
-                    sprintf(log_buffer, "Response length: %d", payload.length());
-                    tftLog(log_buffer);
-                    tftLog("Payload received. Parsing...");
                     
-                    // 提取天气信息到 String 变量
                     temperature_str = getValue(payload, "\"temperature\":\"", "\"");
                     humidity_str = getValue(payload, "\"humidity\":\"", "\"");
                     reporttime_str = getValue(payload, "\"reporttime\":\"", "\"");
-                    sprintf(log_buffer, "Temperature: %s°C", temperature_str.c_str());
-                    tftLog(log_buffer);
-                    sprintf(log_buffer, "Humidity: %s%%", humidity_str.c_str());
-                    tftLog(log_buffer);
-                    sprintf(log_buffer, "Report Time: %s", reporttime_str.c_str()); 
-                    tftLog(log_buffer);
 
-                    tftLog("Success! Data parsed.");
-                    http.end(); // 在成功时结束连接
+                    if (temperature_str != "N/A") {
+                        tftLog("Parse SUCCESS.");
+                        sprintf(lastWeatherSyncStr, "Weather Success at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                    } else {
+                        success = false;
+                        tftLog("Parse FAILED. Invalid JSON?");
+                        sprintf(lastWeatherSyncStr, "Parse Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                    }
+                    
+                    http.end();
                     break; 
                 } else {
                     sprintf(log_buffer, "HTTP Error: %s", http.errorToString(httpCode).c_str());
                     tftLog(log_buffer);
-                    String response = http.getString(); // 获取错误响应
-                    tftLog("Response: " + response);
                 }
             } else {
                 sprintf(log_buffer, "HTTP Error: %s", http.errorToString(httpCode).c_str());
                 tftLog(log_buffer);
             }
-            http.end(); // 确保每次循环都结束连接
+            http.end();
         } else {
             tftLog("HTTP begin failed");
         }
-        delay(500); // 重试间隔
+        delay(500);
     } 
     
-    delay(3000); // Let user see the final log status
+    if (!success && strcmp(lastWeatherSyncStr, "Fetching...") == 0) {
+        sprintf(lastWeatherSyncStr, "HTTP Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    }
+
+    delay(2000); 
 
     tft.fillScreen(BG_COLOR);
     tft.setTextDatum(MC_DATUM);
     if (success) {
-        tft.drawString("Weather Updated", 120, 80);
+        tft.setTextColor(TFT_GREEN);
+        tft.drawCentreString("Weather Updated", tft.width()/2, 10,3);
         tft.setTextSize(1);
         
-        // 如果全局变量是 char 数组，需要转换
-        temperature_str.toCharArray(temperature, sizeof(temperature));
-        humidity_str.toCharArray(humidity, sizeof(humidity));
+        snprintf(temperature, sizeof(temperature), "%sC", temperature_str.c_str());
+        snprintf(humidity, sizeof(humidity), "%s%%", humidity_str.c_str());
         reporttime_str.toCharArray(reporttime, sizeof(reporttime)); 
         
-        tft.drawString("Temp: " + temperature_str, 120, 110);
-        tft.drawString("Humidity: " + humidity_str, 120, 130);
-        tft.drawString("ReportTime: " + reporttime_str, 120, 140);
+        tft.drawString("Temp: " + String(temperature), 60, 110);
+        tft.drawString("Humidity: " + String(humidity), 60, 130);
+        tft.drawString("ReportTime: " + reporttime_str, 60, 140);
     } else {
-        tft.drawString("Weather Failed", 120, 80);
+        tft.setTextColor(TFT_RED);
+        tft.drawString("Weather Failed", 60, 80);
+        tft.setTextSize(1);
+        tft.drawString(lastWeatherSyncStr, 60, 110);
     }
     delay(2000);
     return success;
@@ -478,15 +521,32 @@ bool fetchWeather() {
 
 void silentSyncTime() {
     if (WiFi.status() != WL_CONNECTED) return;
+
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.setTextDatum(TR_DATUM);
+
+    strcpy(lastSyncTimeStr, "Syncing Time...");
+
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET, ntpServer);
     if (getLocalTime(&timeinfo, 10000)) {
-        strftime(lastSyncTimeStr, sizeof(lastSyncTimeStr), "Synced @%H:%M", &timeinfo);
-        Serial.println("Silent time sync performed.");
+        strftime(lastSyncTimeStr, sizeof(lastSyncTimeStr), "OK at %H:%M:%S", &timeinfo);
+        Serial.println("Silent time sync performed successfully.");
+    }
+ else {
+        sprintf(lastSyncTimeStr, "Failed at %02d:%02d:%02d, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec");
+        Serial.println("Silent time sync failed.");
     }
 }
 
 void silentFetchWeather() {
     if (WiFi.status() != WL_CONNECTED) return;
+
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.setTextDatum(TR_DATUM);
+
+    strcpy(lastWeatherSyncStr, "Syncing...");
     
     WiFiClient client;
     HTTPClient http;
@@ -500,13 +560,27 @@ void silentFetchWeather() {
             String payload = http.getString();
             String temp_str = getValue(payload, "\"temperature\":\"", "\"");
             String hum_str = getValue(payload, "\"humidity\":\"", "\"");
+            String report_str = getValue(payload, "\"reporttime\":\"", "\"");
 
             if (temp_str != "N/A" && hum_str != "N/A") {
-                snprintf(temperature, sizeof(temperature), "%s C", temp_str.c_str());
-                snprintf(humidity, sizeof(humidity), "%s %%", hum_str.c_str());
+                snprintf(temperature, sizeof(temperature), "%sC", temp_str.c_str());
+                snprintf(humidity, sizeof(humidity), "%s%%", hum_str.c_str());
+                report_str.toCharArray(reporttime, sizeof(reporttime));
+                sprintf(lastWeatherSyncStr, "Weather Success at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                Serial.println("Silent weather fetch performed successfully.");
+            } else {
+                sprintf(lastWeatherSyncStr, "Weather Parse Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                Serial.println("Silent weather fetch failed (parsing).");
             }
+        } else {
+            sprintf(lastWeatherSyncStr, "Weather HTTP Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+            Serial.println("Silent weather fetch failed (HTTP).");
         }
         http.end();
+    }
+ else {
+        sprintf(lastWeatherSyncStr, "Weather connection Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        Serial.println("Silent weather fetch failed (connection).");
     }
 }
 

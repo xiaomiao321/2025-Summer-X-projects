@@ -3,9 +3,7 @@
 #include "Menu.h"
 
 // 旋转编码器引脚定义
-#define ENCODER_CLK 1  // CLK 引脚
-#define ENCODER_DT  0  // DT 引脚
-#define ENCODER_SW  7  // SW 引脚（按钮）
+
 
 // 配置选项：如果顺时针/逆时针方向相反，设置为 1
 #define SWAP_CLK_DT 0  // 0: 正常，1: 交换 CLK 和 DT 逻辑

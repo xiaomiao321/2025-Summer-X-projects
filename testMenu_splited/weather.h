@@ -21,7 +21,8 @@ extern struct tm timeinfo; // Global timeinfo for watchfaces
 extern char temperature[10];
 extern char humidity[10];
 extern char reporttime[25];
-extern char lastSyncTimeStr[20]; // To display last sync time
+extern char lastSyncTimeStr[45]; // To display last sync time
+extern char lastWeatherSyncStr[45]; // To display last weather sync status
 
 void weatherMenu();
 void syncTime();

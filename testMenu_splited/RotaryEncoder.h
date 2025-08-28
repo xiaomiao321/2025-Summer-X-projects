@@ -2,7 +2,9 @@
 #define ROTARY_ENCODER_H
 
 #include <Arduino.h>
-
+#define ENCODER_CLK 1  // CLK 引脚
+#define ENCODER_DT  0  // DT 引脚
+#define ENCODER_SW  7  // SW 引脚（按钮）
 // 初始化旋转编码器引脚和串口
 void initRotaryEncoder();
 
