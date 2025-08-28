@@ -44,7 +44,7 @@ void initRotaryEncoder() {
 int readEncoder() {
   // 去抖动：检查时间间隔
   unsigned long currentTime = millis();
-  if (currentTime - lastEncoderTime < encoderDebounce) {
+  if (currentTime - lastEncoderTime < 5) { // Increased debounce to 5ms
     return 0; // 间隔太短，忽略
   }
   lastEncoderTime = currentTime;
@@ -81,9 +81,8 @@ int readEncoder() {
       Serial.printf("逆时针旋转，计数: %d\n", encoderPos);
       deltaSum = 0;  // 重置累积增量
     }
-
-    lastEncoded = currentEncoded; // Move this line here
   }
+  lastEncoded = currentEncoded; // Moved this line outside the if block
 
   return delta;
 }

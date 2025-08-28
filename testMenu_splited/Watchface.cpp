@@ -29,6 +29,7 @@ static void SandBoxWatchface();
 static void ProgressBarWatchface(); // New watchface
 static void Cube3DWatchface();
 static void GalaxyWatchface();
+static void SimClockWatchface();
 static void PlaceholderWatchface();
 
 struct WatchfaceItem {
@@ -39,6 +40,7 @@ struct WatchfaceItem {
 const WatchfaceItem watchfaceItems[] = {
     {"Vector Scan", VectorScanWatchface},
     {"Simple Clock", SimpleClockWatchface},
+    {"Sim Clock", SimClockWatchface},
     {"Terminal Sim", TerminalSimWatchface},
     {"Code Rain", CodeRainWatchface},
     {"Snow", SnowWatchface},
@@ -475,6 +477,76 @@ static void GalaxyWatchface() {
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(30));
+    }
+}
+
+static void SimClockWatchface() {
+    lastSyncMillis = millis() - syncInterval - 1;
+
+    while(1) {
+        handlePeriodicSync();
+        handleHourlyChime();
+
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
+
+        getLocalTime(&timeinfo);
+        menuSprite.fillSprite(TFT_BLACK);
+
+        int centerX = tft.width() / 2;
+        int centerY = tft.height() / 2;
+        int radius = std::min(tft.width(), tft.height()) / 2 - 10; 
+
+        // Draw clock circle
+        menuSprite.drawCircle(centerX, centerY, radius, TFT_WHITE);
+
+        // Draw center dot
+        menuSprite.fillCircle(centerX, centerY, 3, TFT_WHITE);
+
+        // Hour hand
+        float hourAngle = (timeinfo.tm_hour % 12 + timeinfo.tm_min / 60.0) * 30 - 90; // -90 for 12 o'clock at top
+        int hourX = centerX + (int)(0.5 * radius * cos(hourAngle * M_PI / 180.0));
+        int hourY = centerY + (int)(0.5 * radius * sin(hourAngle * M_PI / 180.0));
+        menuSprite.drawLine(centerX, centerY, hourX, hourY, TFT_RED);
+
+        // Minute hand
+        float minAngle = (timeinfo.tm_min + timeinfo.tm_sec / 60.0) * 6 - 90;
+        int minX = centerX + (int)(0.8 * radius * cos(minAngle * M_PI / 180.0));
+        int minY = centerY + (int)(0.8 * radius * sin(minAngle * M_PI / 180.0));
+        menuSprite.drawLine(centerX, centerY, minX, minY, TFT_GREEN);
+
+        // Second hand
+        float secAngle = (timeinfo.tm_sec + (millis() % 1000) / 1000.0) * 6 - 90;
+        int secX = centerX + (int)(0.9 * radius * cos(secAngle * M_PI / 180.0));
+        int secY = centerY + (int)(0.9 * radius * sin(secAngle * M_PI / 180.0));
+        menuSprite.drawLine(centerX, centerY, secX, secY, TFT_BLUE);
+
+        // --- Draw Time ---
+        char timeStr[6];
+        sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        menuSprite.setTextDatum(TC_DATUM);
+        menuSprite.setTextSize(4);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.drawString(timeStr, tft.width()/2, 5);
+
+        char secStr[5];
+        int tenth = (millis() % 1000) / 100;
+        sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
+        menuSprite.setTextDatum(BC_DATUM);
+        menuSprite.setTextSize(3);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
+
+        menuSprite.pushSprite(0, 0);
+        vTaskDelay(pdMS_TO_TICKS(50)); // Update frequently for smooth second hand
     }
 }
 
