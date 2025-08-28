@@ -1,4 +1,5 @@
 #include <TFT_eSPI.h>
+#include <cmath>
 #include "Buzzer.h"
 #include <vector>
 #include "Watchface.h"
@@ -26,6 +27,8 @@ static void NenoWatchface();
 static void BallsWatchface();
 static void SandBoxWatchface();
 static void ProgressBarWatchface(); // New watchface
+static void Cube3DWatchface();
+static void GalaxyWatchface();
 static void PlaceholderWatchface();
 
 struct WatchfaceItem {
@@ -45,8 +48,8 @@ const WatchfaceItem watchfaceItems[] = {
     {"Sand Box", SandBoxWatchface},
     {"Progress Bar", ProgressBarWatchface},
     {"Vector Scroll", VectorScrollWatchface},
-    {"3D Cube", PlaceholderWatchface},
-    {"Galaxy", PlaceholderWatchface},
+    {"3D Cube", Cube3DWatchface},
+    {"Galaxy", GalaxyWatchface},
 };
 const int WATCHFACE_COUNT = sizeof(watchfaceItems) / sizeof(watchfaceItems[0]);
 
@@ -247,6 +250,234 @@ static void drawCommonElements() {
 // WATCHFACE IMPLEMENTATIONS
 // =================================================================================================
 
+// --- 3D Cube ---
+#define CUBE_SIZE 25
+
+static const int16_t cube_vertices_start[] = {
+    -CUBE_SIZE, -CUBE_SIZE, -CUBE_SIZE,
+    CUBE_SIZE, -CUBE_SIZE, -CUBE_SIZE,
+    CUBE_SIZE, CUBE_SIZE, -CUBE_SIZE,
+    -CUBE_SIZE, CUBE_SIZE, -CUBE_SIZE,
+    -CUBE_SIZE, -CUBE_SIZE, CUBE_SIZE,
+    CUBE_SIZE, -CUBE_SIZE, CUBE_SIZE,
+    CUBE_SIZE, CUBE_SIZE, CUBE_SIZE,
+    -CUBE_SIZE, CUBE_SIZE, CUBE_SIZE
+};
+
+static const uint8_t cube_indices[] = {
+    0, 1, 1, 2, 2, 3, 3, 0,
+    4, 5, 5, 6, 6, 7, 7, 4,
+    0, 4, 1, 5, 2, 6, 3, 7
+};
+
+static void Cube3DWatchface() {
+    lastSyncMillis = millis() - syncInterval - 1;
+    static float rot = 0;
+    static float rotInc = 1;
+    int16_t cube_vertices[8 * 3];
+
+    while(1) {
+        handlePeriodicSync();
+        handleHourlyChime();
+
+        int encoderChange = readEncoder();
+        if (encoderChange != 0) {
+            rotInc += encoderChange;
+            if (rotInc > 10) rotInc = 10;
+            if (rotInc < 1) rotInc = 1;
+            tone(BUZZER_PIN, 1000, 50);
+        }
+
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
+
+        getLocalTime(&timeinfo);
+        menuSprite.fillSprite(TFT_BLACK);
+        
+        memcpy(cube_vertices, cube_vertices_start, sizeof(cube_vertices_start));
+
+        rot += rotInc / 10.0;
+        if(rot >= 360) rot = 0;
+        else if(rot < 0) rot = 359;
+
+        float rot_rad = rot * M_PI / 180.0;
+        float rot_rad2 = (rot * 1.5) * M_PI / 180.0; // Adjusted rotation speed for different axes
+        float rot_rad3 = (rot * 2.0) * M_PI / 180.0;
+
+        float sin_rot = sin(rot_rad);
+        float cos_rot = cos(rot_rad);
+        float sin_rot2 = sin(rot_rad2);
+        float cos_rot2 = cos(rot_rad2);
+        float sin_rot3 = sin(rot_rad3);
+        float cos_rot3 = cos(rot_rad3);
+
+        for(int i=0; i<8; ++i) {
+            int16_t* vertex = &cube_vertices[i * 3];
+            int16_t x = vertex[0], y = vertex[1], z = vertex[2];
+
+            int16_t x_new = x * cos_rot - y * sin_rot;
+            int16_t y_new = y * cos_rot + x * sin_rot;
+            x = x_new; y = y_new;
+
+            x_new = x * cos_rot2 - z * sin_rot2;
+            z = z * cos_rot2 + x * sin_rot2;
+            x = x_new;
+
+            y_new = y * cos_rot3 - z * sin_rot3;
+            z = z * cos_rot3 + y * sin_rot3;
+            y = y_new;
+
+            int16_t z_new = z + 80;
+            x = (x * 128) / z_new;
+            y = (y * 128) / z_new;
+
+            x += tft.width() / 2;
+            y += tft.height() / 2;
+
+            vertex[0] = x;
+            vertex[1] = y;
+        }
+
+        for(int i=0; i<12; ++i) {
+            const uint8_t* indices = &cube_indices[i * 2];
+            int16_t* p1 = &cube_vertices[indices[0] * 3];
+            int16_t* p2 = &cube_vertices[indices[1] * 3];
+            menuSprite.drawLine(p1[0], p1[1], p2[0], p2[1], TFT_WHITE);
+        }
+
+        char timeStr[6];
+        sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        menuSprite.setTextDatum(TC_DATUM);
+        menuSprite.setTextSize(4);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.drawString(timeStr, tft.width()/2, 5);
+
+        char secStr[5];
+        int tenth = (millis() % 1000) / 100;
+        sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
+        menuSprite.setTextDatum(BC_DATUM);
+        menuSprite.setTextSize(3);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
+
+        menuSprite.pushSprite(0, 0);
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
+// --- Galaxy ---
+struct GalaxyStar {
+    int x;
+    int y;
+    int time;
+};
+
+static GalaxyStar galaxy_stars[50];
+
+static float galaxy_radians(float angle) {
+    return angle * M_PI / 180.0;
+}
+
+static void galaxy_draw_spiral_stars(uint16_t num_stars, uint16_t arm_length, uint16_t spread, uint16_t rotation_offset) {
+    for (int i = 0; i < num_stars; i++) {
+        int angle = i * spread + rotation_offset;
+        int length = arm_length * i / num_stars;
+        
+        int x = length * cos(galaxy_radians(angle)) * 3 / 5;
+        int y = length * sin(galaxy_radians(angle)) * 3 / 5;
+        
+        menuSprite.drawPixel(x + tft.width() / 2, y + tft.height() / 2, TFT_WHITE);
+    }
+}
+
+static void galaxy_draw_main() {
+    static uint16_t rotation_angle = 0;
+    for (int i = 0; i < 4; i++) {
+        galaxy_draw_spiral_stars(15, 130, 10, i * 90 + rotation_angle);
+    }
+    if (++rotation_angle >= 360) {
+        rotation_angle = 0;
+    }
+}
+
+static void galaxy_random_drawStars() {
+    static uint32_t time_counter = 0;
+    if (time_counter % 2 == 0) {
+        int i = 0;
+        while (galaxy_stars[i].time && i < 50) {
+            i++;
+        }
+        if (i < 50) {
+            galaxy_stars[i].time = 30;
+            galaxy_stars[i].x = util_random(tft.width());
+            galaxy_stars[i].y = util_random(tft.height());
+        }
+    }
+
+    for (int i = 0; i < 50; i++) {
+        if (galaxy_stars[i].time > 0) {
+            galaxy_stars[i].time--;
+            menuSprite.drawPixel(galaxy_stars[i].x, galaxy_stars[i].y, TFT_WHITE);
+        }
+    }
+    time_counter++;
+}
+
+static void GalaxyWatchface() {
+    lastSyncMillis = millis() - syncInterval - 1;
+    for(int i=0; i<50; ++i) {
+        galaxy_stars[i].time = 0;
+    }
+
+    while(1) {
+        handlePeriodicSync();
+        handleHourlyChime();
+
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
+
+        getLocalTime(&timeinfo);
+        menuSprite.fillSprite(TFT_BLACK);
+        
+        galaxy_draw_main();
+        galaxy_random_drawStars();
+
+        char timeStr[6];
+        sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        menuSprite.setTextDatum(TC_DATUM);
+        menuSprite.setTextSize(4);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.drawString(timeStr, tft.width()/2, 5);
+
+        char secStr[5];
+        int tenth = (millis() % 1000) / 100;
+        sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
+        menuSprite.setTextDatum(BC_DATUM);
+        menuSprite.setTextSize(3);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
+
+        menuSprite.pushSprite(0, 0);
+        vTaskDelay(pdMS_TO_TICKS(30));
+    }
+}
+
 static void PlaceholderWatchface() {
     lastSyncMillis = millis() - syncInterval - 1;
     while(1) {
@@ -420,6 +651,15 @@ static void VectorScrollWatchface() {
             menuSprite.drawString(":", start_x + num_w*2 + 10, y_main + 5); // Adjusted position
         }
 
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextDatum(TL_DATUM); // Top-Left datum
+        int x_pos = tickers[5].x + tickers[5].w;
+        int y_pos = tickers[5].y + tickers[5].h - 8; // -8 for font height
+        menuSprite.drawString(String(tenth), x_pos, y_pos);
+
         menuSprite.pushSprite(0,0);
         vTaskDelay(pdMS_TO_TICKS(20));
     }
@@ -496,6 +736,15 @@ static void VectorScanWatchface() {
             menuSprite.drawString(":", start_x + num_w*2 + 10, y_main + 5); // Adjusted position
         }
 
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextDatum(TL_DATUM); // Make sure datum is correct
+        int x_pos = tickers[5].x + tickers[5].w;
+        int y_pos = tickers[5].y + tickers[5].h - 8;
+        menuSprite.drawString(String(tenth), x_pos, y_pos);
+
         menuSprite.pushSprite(0,0);
         vTaskDelay(pdMS_TO_TICKS(20));
     }
@@ -504,7 +753,6 @@ static void VectorScanWatchface() {
 // --- Simple Clock ---
 static void SimpleClockWatchface() {
     lastSyncMillis = millis() - syncInterval - 1;
-    unsigned long lastDrawTime = 0;
     while(1) {
         handlePeriodicSync();
         handleHourlyChime();
@@ -520,23 +768,27 @@ static void SimpleClockWatchface() {
             return;
         }
         
-        unsigned long currentTime = millis();
-        if (currentTime - lastDrawTime >= 1000) {
-            lastDrawTime = currentTime;
+        getLocalTime(&timeinfo);
+        menuSprite.fillSprite(TFT_BLACK);
+        drawCommonElements();
 
-            getLocalTime(&timeinfo);
-            menuSprite.fillSprite(TFT_BLACK);
-            drawCommonElements();
+        menuSprite.setTextDatum(MC_DATUM);
+        char timeStr[10];
+        sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        menuSprite.setTextSize(5);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        
+        int timeWidth = menuSprite.textWidth(timeStr);
+        int timeX = tft.width()/2;
+        int timeY = tft.height()/2 + 20;
+        menuSprite.drawString(timeStr, timeX, timeY);
 
-            menuSprite.setTextDatum(MC_DATUM);
-            char timeStr[10];
-            sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-            menuSprite.setTextSize(5);
-            menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-            menuSprite.drawString(timeStr, tft.width()/2, tft.height()/2 + 20);
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
-            menuSprite.pushSprite(0, 0);
-        }
+        menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
@@ -588,7 +840,16 @@ static void shared_rain_logic(uint16_t color) {
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, tft.height()/2 + 20);
+        
+        int timeWidth = menuSprite.textWidth(timeStr);
+        int timeX = tft.width()/2;
+        int timeY = tft.height()/2 + 20;
+        menuSprite.drawString(timeStr, timeX, timeY);
+
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -634,7 +895,16 @@ static void SnowWatchface() {
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, tft.height()/2 + 20);
+        
+        int timeWidth = menuSprite.textWidth(timeStr);
+        int timeX = tft.width()/2;
+        int timeY = tft.height()/2 + 20;
+        menuSprite.drawString(timeStr, timeX, timeY);
+
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(30));
@@ -676,7 +946,16 @@ static void WavesWatchface() {
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, tft.height()/2 + 20);
+        
+        int timeWidth = menuSprite.textWidth(timeStr);
+        int timeX = tft.width()/2;
+        int timeY = tft.height()/2 + 20;
+        menuSprite.drawString(timeStr, timeX, timeY);
+
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -717,7 +996,16 @@ static void NenoWatchface() {
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, tft.height()/2 + 20);
+        
+        int timeWidth = menuSprite.textWidth(timeStr);
+        int timeX = tft.width()/2;
+        int timeY = tft.height()/2 + 20;
+        menuSprite.drawString(timeStr, timeX, timeY);
+
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -768,7 +1056,16 @@ static void BallsWatchface() {
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, tft.height()/2 + 20);
+        
+        int timeWidth = menuSprite.textWidth(timeStr);
+        int timeX = tft.width()/2;
+        int timeY = tft.height()/2 + 20;
+        menuSprite.drawString(timeStr, timeX, timeY);
+
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -823,7 +1120,16 @@ static void SandBoxWatchface() {
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, tft.height()/2 + 20);
+        
+        int timeWidth = menuSprite.textWidth(timeStr);
+        int timeX = tft.width()/2;
+        int timeY = tft.height()/2 + 20;
+        menuSprite.drawString(timeStr, timeX, timeY);
+
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -862,7 +1168,16 @@ static void ProgressBarWatchface() {
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, 115); // Y-pos below the new date
+        
+        int timeWidth = menuSprite.textWidth(timeStr);
+        int timeX = tft.width()/2;
+        int timeY = 115;
+        menuSprite.drawString(timeStr, timeX, timeY); // Y-pos below the new date
+
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
         // --- Progress Bars ---
         menuSprite.setTextDatum(TL_DATUM);
