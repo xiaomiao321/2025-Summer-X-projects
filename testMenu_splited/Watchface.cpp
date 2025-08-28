@@ -17,6 +17,7 @@ extern void showMenuConfig();
 // Forward declare all watchface functions
 static void SimpleClockWatchface();
 static void VectorScanWatchface();
+static void VectorScrollWatchface();
 static void TerminalSimWatchface();
 static void CodeRainWatchface();
 static void SnowWatchface();
@@ -43,7 +44,7 @@ const WatchfaceItem watchfaceItems[] = {
     {"Bouncing Balls", BallsWatchface},
     {"Sand Box", SandBoxWatchface},
     {"Progress Bar", ProgressBarWatchface},
-    {"Vector Scroll", PlaceholderWatchface},
+    {"Vector Scroll", VectorScrollWatchface},
     {"3D Cube", PlaceholderWatchface},
     {"Galaxy", PlaceholderWatchface},
 };
@@ -309,6 +310,119 @@ static void drawTickerNum(TickerData* data) {
 
     menuSprite.drawFastHLine(x, y + h - reveal_height, w, TFT_WHITE);
     menuSprite.drawLine(tft.width()/2, tft.height()-1, x + w/2, y + h - reveal_height, TFT_GREEN);
+}
+
+// --- Vector Scroll ---
+static void drawVectorScrollTickerNum(TickerData* data) {
+    int16_t y_pos = data->y_pos;
+    int16_t x = data->x, y = data->y, h = data->h;
+    uint8_t prev_val = (data->val == 0) ? data->max_val : data->val - 1;
+    char current_char[2] = {(char)('0' + data->val), '\0'};
+    char prev_char[2] = {(char)('0' + prev_val), '\0'};
+
+    if (!data->moving || y_pos == 0 || y_pos > h + TICKER_GAP) {
+        menuSprite.drawString(current_char, x, y);
+        return;
+    }
+
+    // Draw the new number scrolling in from the bottom
+    // It starts at y + h + TICKER_GAP and moves to y.
+    int16_t new_y = y + h + TICKER_GAP - y_pos;
+    menuSprite.drawString(current_char, x, new_y);
+
+    // Draw the old number scrolling up and out
+    // It starts at y and moves to y - (h + TICKER_GAP)
+    int16_t old_y = y - y_pos;
+    menuSprite.drawString(prev_char, x, old_y);
+}
+
+static void VectorScrollWatchface() {
+    lastSyncMillis = millis() - syncInterval - 1;
+    time_s last_time = {255, 255, 255};
+    TickerData tickers[6];
+    
+    int num_w = 35, num_h = 50;
+    int colon_w = 15; // Width for colon spacing
+    int start_x = (tft.width() - (num_w * 4 + colon_w * 2 + num_w * 2)) / 2; // Adjusted for 6 digits + 2 colons
+    int y_main = (tft.height() - num_h) / 2;
+
+    // Hour, Minute, Second tickers
+    tickers[0] = {start_x, y_main, num_w, num_h, 0, 2, false, 0};
+    tickers[1] = {start_x + num_w+5, y_main, num_w, num_h, 0, 9, false, 0};
+    tickers[2] = {start_x + num_w*2 + colon_w + 20, y_main, num_w, num_h, 0, 5, false, 0}; // Shifted right
+    tickers[3] = {start_x + num_w*3 + colon_w + 20+5, y_main, num_w, num_h, 0, 9, false, 0}; // Shifted right
+    // Seconds are now smaller and below minutes
+    int sec_num_w = 20, sec_num_h = 25;
+    int sec_x_offset = tickers[3].x + num_w + 5; // Right of last minute digit, slightly back
+    int sec_y_offset = y_main + num_h - sec_num_h + 5; // Below minutes
+
+    tickers[4] = {sec_x_offset, sec_y_offset, sec_num_w, sec_num_h, 0, 5, false, 0};
+    tickers[5] = {sec_x_offset + sec_num_w, sec_y_offset, sec_num_w, sec_num_h, 0, 9, false, 0};
+
+
+    while(1) {
+        handlePeriodicSync();
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
+
+        getLocalTime(&timeinfo);
+        g_watchface_timeDate.time.hour = timeinfo.tm_hour;
+        g_watchface_timeDate.time.mins = timeinfo.tm_min;
+        g_watchface_timeDate.time.secs = timeinfo.tm_sec;
+
+        if (g_watchface_timeDate.time.hour / 10 != last_time.hour / 10) { tickers[0].moving = true; tickers[0].y_pos = 0; tickers[0].val = g_watchface_timeDate.time.hour / 10; }
+        if (g_watchface_timeDate.time.hour % 10 != last_time.hour % 10) { tickers[1].moving = true; tickers[1].y_pos = 0; tickers[1].val = g_watchface_timeDate.time.hour % 10; }
+        if (g_watchface_timeDate.time.mins / 10 != last_time.mins / 10) { tickers[2].moving = true; tickers[2].y_pos = 0; tickers[2].val = g_watchface_timeDate.time.mins / 10; }
+        if (g_watchface_timeDate.time.mins % 10 != last_time.mins % 10) { tickers[3].moving = true; tickers[3].y_pos = 0; tickers[3].val = g_watchface_timeDate.time.mins % 10; }
+        if (g_watchface_timeDate.time.secs / 10 != last_time.secs / 10) { tickers[4].moving = true; tickers[4].y_pos = 0; tickers[4].val = g_watchface_timeDate.time.secs / 10; }
+        if (g_watchface_timeDate.time.secs % 10 != last_time.secs % 10) { tickers[5].moving = true; tickers[5].y_pos = 0; tickers[5].val = g_watchface_timeDate.time.secs % 10; }
+        last_time = g_watchface_timeDate.time;
+
+        menuSprite.fillSprite(TFT_BLACK);
+        drawCommonElements(); 
+        menuSprite.setTextDatum(TL_DATUM);
+
+        // Update and draw tickers
+        for (int i=0; i<6; ++i) {
+            bool is_sec = (i >= 4);
+            int current_h = is_sec ? sec_num_h : num_h;
+            menuSprite.setTextSize(is_sec ? 3 : 7); // smaller seconds
+            
+            if (tickers[i].moving) {
+                int16_t* yPos = &tickers[i].y_pos;
+                if(*yPos <= 3) (*yPos)++;
+                else if(*yPos <= 6) (*yPos) += 3;
+                else if(*yPos <= 16) (*yPos) += 5;
+                else if(*yPos <= 22) (*yPos) += 3;
+                else if(*yPos <= current_h + TICKER_GAP) (*yPos)++;
+                
+                if (*yPos > current_h + TICKER_GAP) {
+                    tickers[i].moving = false;
+                    tickers[i].y_pos = 0;
+                }
+            }
+            drawVectorScrollTickerNum(&tickers[i]);
+        }
+
+        // Draw blinking colon between HH and MM
+        if (millis() % 1000 < 500) {
+            menuSprite.setTextSize(4); // Smaller colon
+            menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+            menuSprite.drawString(":", start_x + num_w*2 + 10, y_main + 5); // Adjusted position
+        }
+
+        menuSprite.pushSprite(0,0);
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
 }
 
 static void VectorScanWatchface() {
