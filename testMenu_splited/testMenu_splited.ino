@@ -25,6 +25,7 @@ void setupADC();
 TFT_eSPI tft = TFT_eSPI();         // TFT显示屏对象
 TFT_eSprite menuSprite = TFT_eSprite(&tft);
 void setup() {
+    Buzzer_Init(); // 初始化蜂鸣器
     initRotaryEncoder(); // 初始化旋转编码器
     tft.init(); // 初始化TFT显示屏
     tft.setRotation(1); // 设置屏幕旋转方向

@@ -376,7 +376,9 @@ void syncTime() {
         
         char time_str_buffer[50];
         strftime(time_str_buffer, sizeof(time_str_buffer), "%A, %Y-%m-%d %H:%M:%S", &timeinfo);
-        sprintf(log_buffer, "Current Time: \n %s", time_str_buffer);
+        sprintf(log_buffer, "Current Time", time_str_buffer);
+        tftLog(log_buffer);
+        sprintf(log_buffer, "%s", time_str_buffer);
         tftLog(log_buffer);
         Serial.println(log_buffer);
         

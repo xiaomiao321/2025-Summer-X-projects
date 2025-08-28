@@ -1,4 +1,5 @@
 #include <TFT_eSPI.h>
+#include "Buzzer.h"
 #include <vector>
 #include "Watchface.h"
 #include "RotaryEncoder.h"
@@ -9,7 +10,6 @@
 // =================================================================================================
 // Forward Declarations & Menu Setup
 // =================================================================================================
-#define BUZZER_PIN 5
 extern TFT_eSPI tft;
 extern TFT_eSprite menuSprite;
 extern void showMenuConfig();
@@ -133,6 +133,60 @@ void draw_char(int16_t x, int16_t y, char c, uint16_t color, uint16_t bg, uint8_
 }
 
 // =================================================================================================
+// Hourly Chime Logic
+// =================================================================================================
+static int g_lastChimeSecond = -1;
+static TaskHandle_t g_hourlyMusicTaskHandle = NULL;
+static int g_hourlySongIndex = 0;
+
+static void handleHourlyChime() {
+    static unsigned long lastChimeCheck = 0;
+
+    // This function will be called frequently from watchface loops.
+    // We only run the logic once per second.
+    if (millis() - lastChimeCheck < 1000) {
+        return;
+    }
+    lastChimeCheck = millis();
+
+    getLocalTime(&timeinfo);
+
+    // Check if the music task has finished on its own
+    if (g_hourlyMusicTaskHandle != NULL && eTaskGetState(g_hourlyMusicTaskHandle) == eDeleted) {
+        g_hourlyMusicTaskHandle = NULL;
+    }
+
+    // Sequence from 59:55 to 59:59
+    if (timeinfo.tm_min == 59 && timeinfo.tm_sec >= 55) {
+        if (g_lastChimeSecond != timeinfo.tm_sec) {
+            int freq = 1000 + (timeinfo.tm_sec - 55) * 200; // Increasing pitch
+            tone(BUZZER_PIN, freq, 100);
+            g_lastChimeSecond = timeinfo.tm_sec;
+        }
+    } 
+    // At 00:00, play music
+    else if (timeinfo.tm_min == 0 && timeinfo.tm_sec == 0) {
+        if (g_lastChimeSecond == 59) { // Trigger only once when coming from 59:59
+            tone(BUZZER_PIN, 2500, 150); // Final, highest pitch beep
+
+            // If a song is already playing, stop it before starting a new one
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+            }
+
+            // Start a random song
+            g_hourlySongIndex = util_random(numSongs);
+            stopBuzzerTask = false; // Reset stop flag
+            xTaskCreatePinnedToCore(Buzzer_PlayMusic_Task, "Buzzer_Music_Task", 8192, &g_hourlySongIndex, 1, &g_hourlyMusicTaskHandle, 0);
+        }
+        g_lastChimeSecond = timeinfo.tm_sec;
+    } else {
+        // Reset for next hour
+        g_lastChimeSecond = -1;
+    }
+}
+
+// =================================================================================================
 // Common Watchface Logic
 // =================================================================================================
 
@@ -196,7 +250,17 @@ static void PlaceholderWatchface() {
     lastSyncMillis = millis() - syncInterval - 1;
     while(1) {
         handlePeriodicSync();
-        if (readButton()) { tone(BUZZER_PIN, 1500, 50); return; }
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
 
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);
@@ -272,7 +336,17 @@ static void VectorScanWatchface() {
 
     while(1) {
         handlePeriodicSync();
-        if (readButton()) { tone(BUZZER_PIN, 1500, 50); return; }
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
 
         getLocalTime(&timeinfo);
         g_watchface_timeDate.time.hour = timeinfo.tm_hour;
@@ -319,8 +393,15 @@ static void SimpleClockWatchface() {
     unsigned long lastDrawTime = 0;
     while(1) {
         handlePeriodicSync();
+        handleHourlyChime();
 
         if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
             tone(BUZZER_PIN, 1500, 50);
             return;
         }
@@ -362,7 +443,17 @@ static void shared_rain_logic(uint16_t color) {
     }
     while(1) {
         handlePeriodicSync();
-        if (readButton()) { tone(BUZZER_PIN, 1500, 50); return; }
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
 
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);
@@ -401,7 +492,17 @@ static void SnowWatchface() {
     for(auto& p : snow_particles) { p.first = util_random_range(0, tft.width()); p.second = util_random_range(0, tft.height()); }
     while(1) {
         handlePeriodicSync();
-        if (readButton()) { tone(BUZZER_PIN, 1500, 50); return; }
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
 
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);
@@ -432,7 +533,17 @@ static void WavesWatchface() {
     float time = 0;
     while(1) {
         handlePeriodicSync();
-        if (readButton()) { tone(BUZZER_PIN, 1500, 50); return; }
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
 
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);
@@ -464,7 +575,17 @@ static void NenoWatchface() {
     float time = 0;
     while(1) {
         handlePeriodicSync();
-        if (readButton()) { tone(BUZZER_PIN, 1500, 50); return; }
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
 
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);
@@ -504,7 +625,17 @@ static void BallsWatchface() {
     }
     while(1) {
         handlePeriodicSync();
-        if (readButton()) { tone(BUZZER_PIN, 1500, 50); return; }
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
 
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);
@@ -539,7 +670,17 @@ static void SandBoxWatchface() {
     lastSyncMillis = millis() - syncInterval - 1;
     while(1) {
         handlePeriodicSync();
-        if (readButton()) { tone(BUZZER_PIN, 1500, 50); return; }
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
 
         getLocalTime(&timeinfo);
         
@@ -585,7 +726,17 @@ static void ProgressBarWatchface() {
     lastSyncMillis = millis() - syncInterval - 1;
     while(1) {
         handlePeriodicSync();
-        if (readButton()) { tone(BUZZER_PIN, 1500, 50); return; }
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
 
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);

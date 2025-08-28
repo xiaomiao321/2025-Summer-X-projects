@@ -5,6 +5,7 @@
 #include "LED.h"
 #include "arduinoFFT.h"
 #include <math.h>
+#include "Menu.h"
 // FFT Constants
 #define SAMPLES 256
 #define SAMPLING_FREQUENCY 4000
@@ -280,11 +281,10 @@ void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int curren
   drawSpectrum(scheme);
 }
 
-// 蜂鸣器初始化任务
-void Buzzer_Init_Task(void *pvParameters) {
+// 蜂鸣器初始化
+void Buzzer_Init() {
   pinMode(BUZZER_PIN, OUTPUT);
   Serial.println("无源蜂鸣器初始化完成");
-  vTaskDelete(NULL);
 }
 
 // LED Animation Task
@@ -431,8 +431,50 @@ exit_loop:
   vTaskDelete(NULL);
 }
 
+// New task for playing music in the background without screen updates
+void Buzzer_PlayMusic_Task(void *pvParameters) {
+  int songIndex = *(int*)pvParameters;
+  Song song;
+  memcpy_P(&song, &songs[songIndex], sizeof(Song));
+
+  Serial.printf("Starting background song: %s\n", song.name);
+
+  for (int i = 0; i < song.length; i++) {
+    if (stopBuzzerTask) {
+      noTone(BUZZER_PIN);
+      strip.clear();
+      strip.show();
+      stopBuzzerTask = false;
+      Serial.println("Buzzer_PlayMusic_Task stopped by flag.");
+      vTaskDelete(NULL);
+      return;
+    }
+
+    int note = pgm_read_word(song.melody + i);
+    int duration = pgm_read_word(song.durations + i);
+    
+    tone(BUZZER_PIN, note, duration);
+
+    // Keep LED effects
+    currentLedCommand.effectType = (i % 2 == 0) ? 1 : 2;
+    currentLedCommand.color = mapFrequencyToColor(note);
+    currentLedCommand.frequency = note;
+
+    vTaskDelay(pdMS_TO_TICKS(duration * 1.1));
+    
+    noTone(BUZZER_PIN); // Ensure tone is off before next note
+  }
+
+  Serial.printf("Background song %s finished.\n", song.name);
+  
+  strip.clear();
+  strip.show();
+  vTaskDelete(NULL);
+}
+
 // 双击检测
 bool detectDoubleClick() {
+
   static unsigned long lastClickTime = 0;
   unsigned long currentTime = millis();
   if (currentTime - lastClickTime < 500) { // 500ms 内两次点击
@@ -496,7 +538,6 @@ select_song:
   }
 
   // 启动播放任务
-  xTaskCreatePinnedToCore(Buzzer_Init_Task, "Buzzer_Init", 8192, NULL, 2, NULL, 0);
   xTaskCreatePinnedToCore(Buzzer_Task, "Buzzer_Task", 8192, &selectedSongIndex, 1, NULL, 0);
   xTaskCreatePinnedToCore(Led_Task, "Led_Task", 4096, NULL, 1, NULL, 0); // Start LED task
 
