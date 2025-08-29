@@ -168,10 +168,15 @@ void GamesMenu() {
             tone(BUZZER_PIN, 1000 * (game_picture_flag + 1), 20);
             int16_t target_display = INITIAL_X_OFFSET - (game_picture_flag * ICON_SPACING);
 
-            for (uint8_t step = ANIMATION_STEPS; step > 0; step--) {
-                ui_run_easing(&game_display, target_display, step);
+            int16_t start_display = game_display; // Capture the starting position
+            for (uint8_t i = 0; i <= ANIMATION_STEPS; i++) { // Loop from 0 to ANIMATION_STEPS
+                float t = (float)i / ANIMATION_STEPS; // Progress from 0.0 to 1.0
+                float eased_t = easeOutQuad(t); // Apply easing
+
+                game_display = start_display + (target_display - start_display) * eased_t; // Calculate interpolated position
+
                 drawGameIcons(game_display);
-                vTaskDelay(pdMS_TO_TICKS(15));
+                vTaskDelay(pdMS_TO_TICKS(15)); // Keep delay for now
             }
 
             game_display = target_display;

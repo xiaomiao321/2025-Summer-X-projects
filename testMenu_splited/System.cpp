@@ -270,7 +270,7 @@ void tftLog(String text, uint16_t color) {
     String fullText = "> " + text;
     
     // 使用typeWriterEffect显示完整内容
-    typeWriterEffect(fullText.c_str(), LOG_MARGIN, tft_log_y, color, 8, false);
+    typeWriterEffect(fullText.c_str(), LOG_MARGIN, tft_log_y, color, 8, true);
     
     tft_log_y += LOG_LINE_HEIGHT;
     current_log_lines++;

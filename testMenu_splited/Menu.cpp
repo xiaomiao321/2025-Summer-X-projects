@@ -65,17 +65,7 @@ float easeOutQuad(float t) {
     return 1.0f - (1.0f - t) * (1.0f - t);
 }
 
-// Smooth animation movement
-void ui_run_easing(int16_t *current, int16_t target, uint8_t steps) {
-    if (*current == target) return;
-    float t = (float)(ANIMATION_STEPS - steps) / ANIMATION_STEPS;
-    float eased = easeOutQuad(t);
-    int16_t delta = target - *current;
-    *current += (int16_t)(delta * eased / steps);
-    if (abs(*current - target) < 2) {
-        *current = target;
-    }
-}
+
 
 // Draw main menu
 void drawMenuIcons(int16_t offset) {
@@ -129,12 +119,17 @@ void showMenu() {
             picture_flag = (picture_flag == 0) ? MENU_ITEM_COUNT - 1 : picture_flag - 1;
         }
         tone(BUZZER_PIN, 1000*(picture_flag + 1), 20);
+        int16_t start_display = display; // Capture the starting position
         int16_t target_display = INITIAL_X_OFFSET - (picture_flag * ICON_SPACING);
         
-        for (uint8_t step = ANIMATION_STEPS; step > 0; step--) {
-            ui_run_easing(&display, target_display, step);
+        for (uint8_t i = 0; i <= ANIMATION_STEPS; i++) { // Loop from 0 to ANIMATION_STEPS
+            float t = (float)i / ANIMATION_STEPS; // Progress from 0.0 to 1.0
+            float eased_t = easeOutQuad(t); // Apply easing
+
+            display = start_display + (target_display - start_display) * eased_t; // Calculate interpolated position
+
             drawMenuIcons(display);
-            vTaskDelay(pdMS_TO_TICKS(15));
+            vTaskDelay(pdMS_TO_TICKS(20)); // Increased delay for smoother animation
         }
         
         display = target_display;
