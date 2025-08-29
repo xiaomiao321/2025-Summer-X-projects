@@ -8,6 +8,12 @@
 #include "img.h"
 #include <time.h> // For struct tm
 
+
+// --- Time and Date Colors ---
+#define TIME_MAIN_COLOR     TFT_CYAN
+#define TIME_TENTH_COLOR    TFT_WHITE
+#define DATE_WEEKDAY_COLOR  TFT_WHITE
+#define DATE_DATE_COLOR     TFT_WHITE
 // =================================================================================================
 // Forward Declarations & Menu Setup
 // =================================================================================================
@@ -241,13 +247,14 @@ static void drawCommonElements() {
     
     // Line 1: Weekday
     menuSprite.setTextSize(3);
-    menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+    menuSprite.setTextColor(DATE_WEEKDAY_COLOR, TFT_BLACK);
     menuSprite.drawString(weekDayStr[timeinfo.tm_wday], tft.width() / 2, 45); // Y=45
 
     // Line 2: YYYY-MM-DD
     char dateStr[20];
     sprintf(dateStr, "%d-%02d-%02d", timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday);
     menuSprite.setTextSize(3);
+    menuSprite.setTextColor(DATE_DATE_COLOR, TFT_BLACK); // Added color for date
     menuSprite.drawString(dateStr, tft.width() / 2, 75); // Y=75
 
     // Last Sync Time (bottom center)
@@ -265,13 +272,22 @@ static void drawCommonElements() {
     // WiFi Status
     menuSprite.setTextDatum(BC_DATUM);
     menuSprite.setTextSize(1);
-    menuSprite.setTextColor(TFT_WHITE, TFT_BLACK); // White for general status
+    if(ensureWiFiConnected())
+    {
+        menuSprite.setTextColor(TFT_GREEN, TFT_BLACK); // White for general status
+    }
+    else
+    {
+        menuSprite.setTextColor(TFT_RED,TFT_BLACK);
+    }
     menuSprite.drawString(wifiStatusStr, 120, tft.height()-35); // 10 pixels above lastWeatherSyncStr
+    menuSprite.setTextColor(TIME_MAIN_COLOR,TFT_BLACK);
 }
 
 // =================================================================================================
 // WATCHFACE IMPLEMENTATIONS
 // =================================================================================================
+
 
 // --- 3D Cube ---
 #define CUBE_SIZE 25
@@ -373,14 +389,14 @@ static void Cube3DWatchface() {
             const uint8_t* indices = &cube_indices[i * 2];
             int16_t* p1 = &cube_vertices[indices[0] * 3];
             int16_t* p2 = &cube_vertices[indices[1] * 3];
-            menuSprite.drawLine(p1[0], p1[1], p2[0], p2[1], TFT_WHITE);
+            menuSprite.drawLine(p1[0], p1[1], p2[0], p2[1], TIME_TENTH_COLOR);
         }
 
         char timeStr[6];
         sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
         menuSprite.setTextDatum(TC_DATUM);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         menuSprite.drawString(timeStr, tft.width()/2, 5);
 
         char secStr[5];
@@ -388,7 +404,7 @@ static void Cube3DWatchface() {
         sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
         menuSprite.setTextDatum(BC_DATUM);
         menuSprite.setTextSize(3);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
         menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
 
         menuSprite.pushSprite(0, 0);
@@ -485,7 +501,7 @@ static void GalaxyWatchface() {
         sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
         menuSprite.setTextDatum(TC_DATUM);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         menuSprite.drawString(timeStr, tft.width()/2, 5);
 
         char secStr[5];
@@ -493,7 +509,7 @@ static void GalaxyWatchface() {
         sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
         menuSprite.setTextDatum(BC_DATUM);
         menuSprite.setTextSize(3);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
         menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
 
         menuSprite.pushSprite(0, 0);
@@ -555,7 +571,7 @@ static void SimClockWatchface() {
         sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
         menuSprite.setTextDatum(TC_DATUM);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         menuSprite.drawString(timeStr, tft.width()/2, 5);
 
         char secStr[5];
@@ -563,7 +579,7 @@ static void SimClockWatchface() {
         sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
         menuSprite.setTextDatum(BC_DATUM);
         menuSprite.setTextSize(3);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
         menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
 
         menuSprite.pushSprite(0, 0);
@@ -740,14 +756,14 @@ static void VectorScrollWatchface() {
         // Draw blinking colon between HH and MM
         if (millis() % 1000 < 500) {
             menuSprite.setTextSize(4); // Smaller colon
-            menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+            menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
             menuSprite.drawString(":", start_x + num_w*2 + 10, y_main + 5); // Adjusted position
         }
 
         // Draw 0.1s digit
         int tenth = (millis() % 1000) / 100;
         menuSprite.setTextSize(1);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
         menuSprite.setTextDatum(TL_DATUM); // Top-Left datum
         int x_pos = tickers[5].x + tickers[5].w;
         int y_pos = tickers[5].y + tickers[5].h - 8; // -8 for font height
@@ -811,7 +827,7 @@ static void VectorScanWatchface() {
         menuSprite.fillSprite(TFT_BLACK);
         drawCommonElements();
         menuSprite.setTextDatum(TL_DATUM);
-
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
   // Update and draw tickers
         for (int i=0; i<6; ++i) {
             menuSprite.setTextSize((i < 4) ? 7 : 3); // HH:MM large, SS smaller
@@ -832,7 +848,7 @@ static void VectorScanWatchface() {
         // Draw 0.1s digit
         int tenth = (millis() % 1000) / 100;
         menuSprite.setTextSize(1);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
         menuSprite.setTextDatum(TL_DATUM); // Make sure datum is correct
         int x_pos = tickers[5].x + tickers[5].w;
         int y_pos = tickers[5].y + tickers[5].h - 8;
@@ -869,7 +885,7 @@ static void SimpleClockWatchface() {
         char timeStr[10];
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(5);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeX = tft.width()/2;
@@ -932,7 +948,7 @@ static void shared_rain_logic(uint16_t color) {
         char timeStr[10];
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeX = tft.width()/2;
@@ -987,7 +1003,7 @@ static void SnowWatchface() {
         char timeStr[10];
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeX = tft.width()/2;
@@ -1038,7 +1054,7 @@ static void WavesWatchface() {
         char timeStr[10];
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeX = tft.width()/2;
@@ -1088,7 +1104,7 @@ static void NenoWatchface() {
         char timeStr[10];
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeX = tft.width()/2;
@@ -1148,7 +1164,7 @@ static void BallsWatchface() {
         char timeStr[10];
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeX = tft.width()/2;
@@ -1212,7 +1228,7 @@ static void SandBoxWatchface() {
         char timeStr[10];
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeX = tft.width()/2;
@@ -1260,7 +1276,7 @@ static void ProgressBarWatchface() {
         char timeStr[10];
         sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeX = tft.width()/2;
@@ -1278,8 +1294,8 @@ static void ProgressBarWatchface() {
         menuSprite.setTextSize(1);
         menuSprite.setTextColor(TFT_CYAN, TFT_BLACK);
 
-        const int bar_y_start = 150; // Move bars down to make space for time
-        const int bar_y_spacing = 30;
+        const int bar_y_start = 140; // Move bars down to make space for time
+        const int bar_y_spacing = 15;
 
         // Day progress bar
         long seconds_in_day = timeinfo.tm_hour * 3600 + timeinfo.tm_min * 60 + timeinfo.tm_sec;
@@ -1305,5 +1321,90 @@ static void ProgressBarWatchface() {
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+static void VectorScanWatchface() {
+    lastSyncMillis = millis() - syncInterval - 1;
+    time_s last_time = {255, 255, 255};
+    TickerData tickers[6];
+    int num_w = 35, num_h = 50;
+    int colon_w = 15; // Width for colon spacing
+    int start_x = (tft.width() - (num_w * 4 + colon_w * 2 + num_w * 2)) / 2; // Adjusted for 6 digits + 2 colons
+    int y_main = (tft.height() - num_h) / 2;
+
+    // Hour, Minute, Second tickers
+    tickers[0] = {start_x, y_main, num_w, num_h, 0, 2, false, 0};
+    tickers[1] = {start_x + num_w+5, y_main, num_w, num_h, 0, 9, false, 0};
+    tickers[2] = {start_x + num_w*2 + colon_w + 20, y_main, num_w, num_h, 0, 5, false, 0}; // Shifted right
+    tickers[3] = {start_x + num_w*3 + colon_w + 20+5, y_main, num_w, num_h, 0, 9, false, 0}; // Shifted right
+    // Seconds are now smaller and below minutes
+    int sec_num_w = 20, sec_num_h = 25;
+    int sec_x_offset = tickers[3].x + num_w + 5; // Right of last minute digit, slightly back
+    int sec_y_offset = y_main + num_h - sec_num_h + 5; // Below minutes
+
+    tickers[4] = {sec_x_offset, sec_y_offset, sec_num_w, sec_num_h, 0, 5, false, 0};
+    tickers[5] = {sec_x_offset + sec_num_w, sec_y_offset, sec_num_w, sec_num_h, 0, 9, false, 0};
+
+
+    while(1) {
+        handlePeriodicSync();
+        handleHourlyChime();
+        if (readButton()) {
+            if (g_hourlyMusicTaskHandle != NULL) {
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            tone(BUZZER_PIN, 1500, 50);
+            return;
+        }
+
+        getLocalTime(&timeinfo);
+        g_watchface_timeDate.time.hour = timeinfo.tm_hour;
+        g_watchface_timeDate.time.mins = timeinfo.tm_min;
+        g_watchface_timeDate.time.secs = timeinfo.tm_sec;
+
+        if (g_watchface_timeDate.time.hour / 10 != last_time.hour / 10) { tickers[0].moving = true; tickers[0].y_pos = 0; tickers[0].val = g_watchface_timeDate.time.hour / 10; }
+        if (g_watchface_timeDate.time.hour % 10 != last_time.hour % 10) { tickers[1].moving = true; tickers[1].y_pos = 0; tickers[1].val = g_watchface_timeDate.time.hour % 10; }
+        if (g_watchface_timeDate.time.mins / 10 != last_time.mins / 10) { tickers[2].moving = true; tickers[2].y_pos = 0; tickers[2].val = g_watchface_timeDate.time.mins / 10; }
+        if (g_watchface_timeDate.time.mins % 10 != last_time.mins % 10) { tickers[3].moving = true; tickers[3].y_pos = 0; tickers[3].val = g_watchface_timeDate.time.mins % 10; }
+        if (g_watchface_timeDate.time.secs / 10 != last_time.secs / 10) { tickers[4].moving = true; tickers[4].y_pos = 0; tickers[4].val = g_watchface_timeDate.time.secs / 10; }
+        if (g_watchface_timeDate.time.secs % 10 != last_time.secs % 10) { tickers[5].moving = true; tickers[5].y_pos = 0; tickers[5].val = g_watchface_timeDate.time.secs % 10; }
+        last_time = g_watchface_timeDate.time;
+
+        menuSprite.fillSprite(TFT_BLACK);
+        drawCommonElements();
+        menuSprite.setTextDatum(TL_DATUM);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
+  // Update and draw tickers
+        for (int i=0; i<6; ++i) {
+            menuSprite.setTextSize((i < 4) ? 7 : 3); // HH:MM large, SS smaller
+            if (tickers[i].moving) {
+                tickers[i].y_pos += 5;
+                if (tickers[i].y_pos >= ((i < 4) ? num_h : sec_num_h) + TICKER_GAP) tickers[i].moving = false;
+            }
+            drawTickerNum(&tickers[i]);
+        }
+
+        // Draw blinking colon between HH and MM
+        if (millis() % 1000 < 500) {
+            menuSprite.setTextSize(4); // Smaller colon
+            menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+            menuSprite.drawString(":", start_x + num_w*2 + 10, y_main + 5); // Adjusted position
+        }
+
+        // Draw 0.1s digit
+        int tenth = (millis() % 1000) / 100;
+        menuSprite.setTextSize(1);
+        menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
+        menuSprite.setTextDatum(TL_DATUM); // Make sure datum is correct
+        int x_pos = tickers[5].x + tickers[5].w;
+        int y_pos = tickers[5].y + tickers[5].h - 8;
+        menuSprite.drawString(String(tenth), x_pos, y_pos);
+
+        menuSprite.pushSprite(0,0);
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }

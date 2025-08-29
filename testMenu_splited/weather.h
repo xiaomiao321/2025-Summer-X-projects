@@ -32,6 +32,6 @@ bool fetchWeather();
 // Silent versions for background updates
 void silentSyncTime();
 void silentFetchWeather();
-
+bool ensureWiFiConnected();
 
 #endif
