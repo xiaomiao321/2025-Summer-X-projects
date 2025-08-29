@@ -1,4 +1,5 @@
 #include "RotaryEncoder.h"
+#include <Preferences.h>
 #include <TFT_eSPI.h>
 #include "img.h"
 #include "LED.h"
@@ -107,10 +108,10 @@ struct GameItem {
 // Game list with placeholder icons and function pointers
 const GameItem gameItems[] = {
     {"Conway's Game", Conway, ConwayGame},
-    {"Snake Game", snake, tanchisheGame},
+    // {"Snake Game", snake, tanchisheGame},
     {"Buzzer Tap", Sound, BuzzerTapGame},
     {"Time Challenge", Timer, TimeChallengeGame},
-    {"Dino Game", Dinasor, dinoGame}, // Placeholder icon
+    // {"Dino Game", Dinasor, dinoGame}, // Placeholder icon
 };
 const uint8_t GAME_ITEM_COUNT = sizeof(gameItems) / sizeof(gameItems[0]);
 
@@ -180,9 +181,6 @@ void GamesMenu() {
         if (readButton()) { // Use readButton() directly
             if (gamesDetectDoubleClick()) { // Double click detected
                 gamesMenuSingleClickPending = false; // Cancel any pending single click
-                display = 48; // Restore main menu state as in other files
-                picture_flag = 0;
-                showMenuConfig();
                 return; // Exit GamesMenu
             } else {
                 // This is a single click (or the first click of a potential double click)
@@ -532,25 +530,26 @@ static const uint16_t PROGRESS_BAR_BG_COLOR = TFT_DARKGREY;
 
 void TimeChallengeGame() {
     tft.fillScreen(TFT_BLACK);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.setTextSize(2); // Initial text size for Target and Timer labels
+    menuSprite.fillSprite(TFT_BLACK); // Clear the sprite before drawing game elements
+    // Reusing global menuSprite for double buffering
+    menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+    menuSprite.setTextSize(2); // Initial text size for Target and Timer labels
+
+    unsigned long lastBuzzerTime = 0;
+    const unsigned long BUZZER_INTERVAL_MS = 1000;
 
     unsigned long targetTimeMs = random(8000, 12001); // 10 to 20 seconds
     float targetTimeSec = targetTimeMs / 1000.0;
 
-    tft.setCursor(20, 30);
-    tft.printf("Target: %.1f s", targetTimeSec);
+    menuSprite.setCursor(20, 30);
+    menuSprite.printf("Target: %.1f s", targetTimeSec);
 
-    tft.setCursor(20, 80);
-    tft.print("Timer: 0.0 s"); // Timer label
-
-    // Draw progress bar background
-    tft.drawRect(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_WHITE); // Border for the bar
-    tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Background fill
+    menuSprite.setCursor(20, 80);
+    menuSprite.print("Timer: 0.0 s"); // Timer label
 
     // Draw progress bar background
-    tft.drawRect(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_WHITE); // Border for the bar
-    tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Background fill
+    menuSprite.drawRect(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, TFT_WHITE); // Border for the bar
+    menuSprite.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Background fill
 
     unsigned long startTime = millis();
     unsigned long pressTime = 0;
@@ -561,11 +560,11 @@ void TimeChallengeGame() {
 
         if (!gameEnded) {
             float elapsedSec = (currentTime - startTime) / 1000.0;
-            tft.fillRect(100, 80, 120, 20, TFT_BLACK); // Clear old timer
-            tft.setTextSize(3); // Set larger size for timer number
-            tft.setCursor(100, 80);
-            tft.printf("%.1f s", elapsedSec); // <-- TIMER NUMBER
-            tft.setTextSize(2); // Reset to default size for labels
+            menuSprite.fillRect(100, 80, 120, 20, TFT_BLACK); // Clear old timer
+            menuSprite.setTextSize(3); // Set larger size for timer number
+            menuSprite.setCursor(100, 80);
+            menuSprite.printf("%.1f s", elapsedSec); // <-- TIMER NUMBER
+            menuSprite.setTextSize(2); // Reset to default size for labels
 
             // Update progress bar
             float progressRatio = (float)(currentTime - startTime) / targetTimeMs;
@@ -577,16 +576,23 @@ void TimeChallengeGame() {
             }
             
             // Clear previous progress and draw new progress
-            tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Clear the filled part
-            tft.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, filledWidth, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_COLOR); // Draw new filled part
+            menuSprite.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, PROGRESS_BAR_WIDTH - 2, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_BG_COLOR); // Clear the filled part
+            menuSprite.fillRect(PROGRESS_BAR_X + 1, PROGRESS_BAR_Y + 1, filledWidth, PROGRESS_BAR_HEIGHT - 2, PROGRESS_BAR_COLOR); // Draw new filled part
 
             
             // Ensure filledWidth does not exceed PROGRESS_BAR_WIDTH
             if (filledWidth > PROGRESS_BAR_WIDTH) {
                 filledWidth = PROGRESS_BAR_WIDTH;
             }
+
+            // Buzzer sound every second
+            if (currentTime - lastBuzzerTime >= BUZZER_INTERVAL_MS) {
+                tone(BUZZER_PIN, 1000, 50); // Play a tone (e.g., 1000 Hz for 50 ms)
+                lastBuzzerTime = currentTime;
+            }
             
         }
+        menuSprite.pushSprite(0, 0); // Push the sprite to the screen
 
         if (readButton()) { // Use readButton() directly
             if (gamesDetectDoubleClick()) { // Double click detected
@@ -598,9 +604,9 @@ void TimeChallengeGame() {
                     tone(BUZZER_PIN, 1500, 100); // Confirmation sound
                     
                     float diffSec = (float)((long)(pressTime - startTime) - (long)targetTimeMs) / 1000.0;
-                    tft.setTextSize(2);
-                    tft.setCursor(20, 130);
-                    tft.printf("Diff: %.2f s", diffSec);
+                    menuSprite.setTextSize(2);
+                    menuSprite.setCursor(20, 130);
+                    menuSprite.printf("Diff: %.2f s", diffSec);
                 }
             }
         }

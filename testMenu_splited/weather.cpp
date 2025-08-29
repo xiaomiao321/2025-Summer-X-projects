@@ -8,7 +8,7 @@
 #include <HTTPClient.h>
 #include "img.h"
 #include "Watchface.h"
-
+#include "System.h"
 // WiFi & Time
 const char* ssid     = "xiaomiao_hotspot";
 const char* password = "xiaomiao123";
@@ -43,27 +43,11 @@ String getValue(String data, String key, String end) {
 }
 
 // Helper for on-screen debug logging
-int tft_log_y = 40;
-void tftLog(const String& text) {
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.setTextDatum(TL_DATUM);
-    
-    if (tft_log_y > tft.height() - 30) {
-        tft_log_y = 40;
-        tft.fillRect(0, 30, tft.width(), tft.height() - 30, TFT_BLACK);
-    }
-    tft.drawString(text, 5, tft_log_y);
-    tft_log_y += 10;
-}
-
-
 void printLocalTime() {
    if(!getLocalTime(&timeinfo)){
-      Serial.println("Failed to obtain time");
+      Serial.printf("Failed to obtain time");
       return;
    }
-   Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
 }
 
 bool connectWiFi() {
@@ -74,32 +58,32 @@ bool connectWiFi() {
     tft_log_y = 40;
 
     char log_buffer[100];
-    tftLog("========= WiFi Scan Start =========");
-    Serial.println("\n=== WiFi Scan Start ===");
+    tftLog("========= WiFi Scan Start =========",TFT_YELLOW);
+    Serial.printf("\n=== WiFi Scan Start ===");
 
     // 先扫描所有可用的 WiFi 网络
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(true);
     delay(1000);
     
-    tftLog("Scanning networks...");
-    Serial.println("Scanning networks...");
+    tftLog("Scanning networks...",TFT_YELLOW);
+    Serial.printf("Scanning networks...");
     
     int n = WiFi.scanNetworks();
     sprintf(log_buffer, "Found %d networks", n);
-    tftLog(log_buffer);
+    tftLog(log_buffer, TFT_YELLOW);
     Serial.printf("Found %d networks:\n", n);
     
     // 显示扫描到的网络
     for (int i = 0; i < n && i < 10; i++) { // 最多显示10个网络
         sprintf(log_buffer, "%d: %s (%ddBm)", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i));
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_YELLOW);
         Serial.printf("%d: %s (%d dBm) Ch%d\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i), WiFi.channel(i));
     }
     
     if (n > 10) {
         sprintf(log_buffer, "... and %d more", n - 10);
-        tftLog(log_buffer);
+        tftLog(log_buffer, TFT_YELLOW);
         Serial.printf("... and %d more networks\n", n - 10);
     }
     
@@ -113,15 +97,15 @@ bool connectWiFi() {
     tft_log_y = 40;
     
     sprintf(log_buffer, "SSID: %s", ssid);
-    tftLog(log_buffer);
-    Serial.println("\n=== WiFi Connection Start ===");
-    Serial.println(log_buffer);
+    tftLog(log_buffer, TFT_YELLOW);
+    Serial.printf("\n=== WiFi Connection Start ===",TFT_YELLOW);
+    Serial.printf(log_buffer);
 
     // 断开之前的连接
     WiFi.disconnect(true);
     delay(1000);
-    tftLog("Disconnected previous");
-    Serial.println("Disconnected previous WiFi connection");
+    tftLog("Disconnected previous", TFT_YELLOW);
+    Serial.printf("Disconnected previous WiFi connection");
     
     // 配置 WiFi 参数
     WiFi.mode(WIFI_STA);
@@ -129,21 +113,21 @@ bool connectWiFi() {
     WiFi.persistent(true);
     WiFi.setSleep(false);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
-    tftLog("WiFi config set");
-    Serial.println("WiFi configuration set");
+    tftLog("WiFi config set", TFT_YELLOW);
+    Serial.printf("WiFi configuration set");
 
     // 显示初始状态
     sprintf(log_buffer, "Init status: %d", WiFi.status());
-    tftLog(log_buffer);
+    tftLog(log_buffer, TFT_YELLOW);
     Serial.printf("Initial WiFi Status: %d\n", WiFi.status());
     
     sprintf(log_buffer, "Init RSSI: %d dBm", WiFi.RSSI());
-    tftLog(log_buffer);
+    tftLog(log_buffer, TFT_YELLOW);
     Serial.printf("Initial RSSI: %d dBm\n", WiFi.RSSI());
 
     WiFi.begin(ssid, password);
-    tftLog("WiFi.begin() called");
-    Serial.println("WiFi.begin() called");
+    tftLog("WiFi.begin() called", TFT_YELLOW);
+    Serial.printf("WiFi.begin() called");
     
     int attempts = 0;
     int max_attempts = 15;
@@ -154,47 +138,47 @@ bool connectWiFi() {
         tft.fillRect(21, tft.height() - 18, (attempts + 1) * (200/max_attempts), 13, TFT_GREEN); 
 
         sprintf(log_buffer, "Attempt %d/%d", attempts + 1, max_attempts);
-        tftLog(log_buffer);
+        tftLog(log_buffer, TFT_YELLOW);
         
         // 详细的连接状态
         sprintf(log_buffer, "Status: %d", WiFi.status());
-        tftLog(log_buffer);
+        tftLog(log_buffer, TFT_YELLOW);
         Serial.printf("\n--- Attempt %d/%d ---\n", attempts + 1, max_attempts);
         Serial.printf("WiFi Status: %d\n", WiFi.status());
         
         sprintf(log_buffer, "RSSI: %d dBm", WiFi.RSSI());
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_YELLOW);
         Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
         
         // 显示具体的连接状态信息
         switch(WiFi.status()) {
             case WL_IDLE_STATUS:
-                tftLog("State: IDLE");
-                Serial.println("State: IDLE");
+                tftLog("State: IDLE", TFT_YELLOW);
+                Serial.printf("State: IDLE");
                 break;
             case WL_NO_SSID_AVAIL:
-                tftLog("Error: SSID not found");
-                Serial.println("Error: SSID not found");
+                tftLog("Error: SSID not found", TFT_RED);
+                Serial.printf("Error: SSID not found");
                 break;
             case WL_CONNECT_FAILED:
-                tftLog("Error: Connect failed");
-                Serial.println("Error: Connection failed");
+                tftLog("Error: Connect failed", TFT_RED);
+                Serial.printf("Error: Connection failed");
                 break;
             case WL_CONNECTION_LOST:
-                tftLog("Error: Connection lost");
-                Serial.println("Error: Connection lost");
+                tftLog("Error: Connection lost", TFT_RED);
+                Serial.printf("Error: Connection lost");
                 break;
             case WL_DISCONNECTED:
-                tftLog("State: Disconnected");
-                Serial.println("State: Disconnected");
+                tftLog("State: Disconnected", TFT_YELLOW);
+                Serial.printf("State: Disconnected");
                 break;
             case WL_SCAN_COMPLETED:
-                tftLog("State: Scan completed");
-                Serial.println("State: Scan completed");
+                tftLog("State: Scan completed", TFT_YELLOW);
+                Serial.printf("State: Scan completed");
                 break;
             default:
                 sprintf(log_buffer, "State: %d", WiFi.status());
-                tftLog(log_buffer);
+                tftLog(log_buffer, TFT_YELLOW);
                 Serial.printf("State: %d\n", WiFi.status());
                 break;
         }
@@ -203,44 +187,44 @@ bool connectWiFi() {
         attempts++;
     }
 
-    tftLog("========= Result =========");
-    Serial.println("\n=== Connection Result ===");
+    tftLog("========= Result =========",TFT_YELLOW);
+    Serial.printf("\n=== Connection Result ===");
     
     sprintf(log_buffer, "Final status: %d", WiFi.status());
-    tftLog(log_buffer);
+    tftLog(log_buffer,TFT_YELLOW);
     Serial.printf("Final WiFi Status: %d\n", WiFi.status());
 
     if (WiFi.status() == WL_CONNECTED) {
         tft.fillScreen(BG_COLOR);
         tft_log_y = 40;
         // 获取详细的网络信息
-        tftLog("WiFi CONNECTED!");
-        Serial.println("WiFi CONNECTED!");
+        tftLog("WiFi CONNECTED!",TFT_GREEN);
+        Serial.printf("WiFi CONNECTED!");
         
         sprintf(log_buffer, "IP: %s", WiFi.localIP().toString().c_str());
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_GREEN);
         Serial.printf("IP Address: %s\n", WiFi.localIP().toString().c_str());
         
         sprintf(log_buffer, "Gateway: %s", WiFi.gatewayIP().toString().c_str());
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_GREEN);
         Serial.printf("Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
         
         sprintf(log_buffer, "DNS: %s", WiFi.dnsIP().toString().c_str());
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_GREEN);
         Serial.printf("DNS: %s\n", WiFi.dnsIP().toString().c_str());
         
         sprintf(log_buffer, "RSSI: %d dBm", WiFi.RSSI());
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_GREEN);
         Serial.printf("RSSI: %d dBm\n", WiFi.RSSI());
         
         sprintf(log_buffer, "MAC: %s", WiFi.macAddress().c_str());
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_GREEN);
         Serial.printf("MAC Address: %s\n", WiFi.macAddress().c_str());
 
         // 设置 DNS
         WiFi.setDNS(IPAddress(8, 8, 8, 8), IPAddress(8, 8, 4, 4));
-        tftLog("DNS set to 8.8.8.8");
-        Serial.println("DNS set to Google DNS");
+        tftLog("DNS set to 8.8.8.8",TFT_GREEN);
+        Serial.printf("DNS set to Google DNS");
         
         delay(2000);
         
@@ -255,34 +239,34 @@ bool connectWiFi() {
         delay(2000);
         
         wifi_connected = true;
-        tftLog("========= WiFi Success =========");
-        Serial.println("=== WiFi Connection Successful ===");
+        tftLog("========= WiFi Success =========",TFT_GREEN);
+        Serial.printf("=== WiFi Connection Successful ===");
         return true;
     } else {
         // 连接失败信息
         sprintf(log_buffer, "FAILED: %d attempts", attempts);
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_RED);
         Serial.printf("WiFi Connection FAILED after %d attempts\n", attempts);
         
         sprintf(log_buffer, "Last RSSI: %d dBm", WiFi.RSSI());
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_RED);
         Serial.printf("Final RSSI: %d dBm\n", WiFi.RSSI());
         
         // 错误状态信息
         switch(WiFi.status()) {
             case WL_NO_SSID_AVAIL:
-                tftLog("SSID not found");
-                Serial.println("SSID not found in scan results");
+                tftLog("SSID not found",TFT_RED);
+                Serial.printf("SSID not found in scan results");
                 break;
             case WL_CONNECT_FAILED:
-                tftLog("Password wrong?");
-                Serial.println("Password may be incorrect");
+                tftLog("Password wrong",TFT_RED);
+                Serial.printf("Password may be incorrect");
                 break;
             case WL_CONNECTION_LOST:
-                tftLog("Connection lost");
+                tftLog("Connection lost",TFT_RED);
                 break;
             default:
-                tftLog("Check SSID/Password");
+                tftLog("Check SSID/Password",TFT_RED);
                 break;
         }
         
@@ -299,8 +283,8 @@ bool connectWiFi() {
         tft.drawString("Attempts: " + String(attempts), 120, 130);
         
         wifi_connected = false;
-        tftLog("========= WiFi Failed =========");
-        Serial.println("=== WiFi Connection Failed ===");
+        tftLog("========= WiFi Failed =========",TFT_RED);
+        Serial.printf("=== WiFi Connection Failed ===");
         delay(2000);
         return false;
     }
@@ -308,7 +292,7 @@ bool connectWiFi() {
 
 void syncTime() {
     if (!wifi_connected) {
-        Serial.println("WiFi not connected, cannot sync time.");
+        Serial.printf("WiFi not connected, cannot sync time.");
         strcpy(lastSyncTimeStr, "No WiFi");
         tft.fillScreen(BG_COLOR);
         tft.setTextDatum(MC_DATUM);
@@ -327,16 +311,16 @@ void syncTime() {
     tft_log_y = 40;
 
     char log_buffer[100];
-    tftLog("========= NTP Time Sync Start =========");
-    Serial.println("\n=== NTP Time Sync Start ===");
+    tftLog("========= NTP Time Sync Start =========",TFT_YELLOW);
+    Serial.printf("\n=== NTP Time Sync Start ===");
 
     sprintf(log_buffer, "NTP Server: %s", ntpServer);
-    tftLog(log_buffer);
-    Serial.println(log_buffer);
+    tftLog(log_buffer,TFT_YELLOW);
+    Serial.printf(log_buffer);
 
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET, ntpServer);
-    tftLog("configTime() called.");
-    Serial.println("configTime() called.");
+    tftLog("configTime() called.",TFT_YELLOW);
+    Serial.printf("configTime() called.");
 
     int attempts = 0;
     int max_attempts = 5;
@@ -347,40 +331,40 @@ void syncTime() {
         tft.fillRect(21, tft.height() - 18, (attempts + 1) * (200 / max_attempts), 13, TFT_GREEN);
 
         sprintf(log_buffer, "Attempt %d/%d...", attempts + 1, max_attempts);
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_YELLOW);
         Serial.printf("\n--- Attempt %d/%d ---\n", attempts + 1, max_attempts);
 
         struct tm timeinfo_temp;
-        tftLog("Calling getLocalTime()...");
-        Serial.println("Calling getLocalTime()...");
+        tftLog("Calling getLocalTime()...",TFT_YELLOW);
+        Serial.printf("Calling getLocalTime()...");
         if (getLocalTime(&timeinfo_temp, 5000)) { // 5-second timeout
             getLocalTime(&timeinfo); 
             strftime(lastSyncTimeStr, sizeof(lastSyncTimeStr), "Time Success at %H:%M:%S", &timeinfo);
             synced = true;
-            tftLog("SUCCESS: Time obtained!");
-            Serial.println("SUCCESS: Time obtained!");
+            tftLog("SUCCESS: Time obtained!",TFT_GREEN);
+            Serial.printf("SUCCESS: Time obtained!");
         } else {
-            tftLog("FAILED: getLocalTime() timeout.");
-            Serial.println("FAILED: getLocalTime() timeout.");
+            tftLog("FAILED: getLocalTime() timeout.",TFT_RED);
+            Serial.printf("FAILED: getLocalTime() timeout.");
         }
         attempts++;
     }
 
-    tftLog("========= Result =========");
-    Serial.println("\n=== Sync Result ===");
+    tftLog("========= Result =========",TFT_YELLOW);
+    Serial.printf("\n=== Sync Result ===");
 
     if (synced) {
         tft.fillRect(21, tft.height() - 18, 200, 13, TFT_GREEN);
-        tftLog("Time Synced Successfully.");
-        Serial.println("Time Synced Successfully.");
+        tftLog("Time Synced Successfully.",TFT_GREEN);
+        Serial.printf("Time Synced Successfully.");
         
         char time_str_buffer[50];
         strftime(time_str_buffer, sizeof(time_str_buffer), "%A, %Y-%m-%d %H:%M:%S", &timeinfo);
         sprintf(log_buffer, "Current Time", time_str_buffer);
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_GREEN);
         sprintf(log_buffer, "%s", time_str_buffer);
-        tftLog(log_buffer);
-        Serial.println(log_buffer);
+        tftLog(log_buffer,TFT_GREEN);
+        Serial.printf(log_buffer);
         
         delay(2000);
         tft.fillScreen(BG_COLOR);
@@ -401,8 +385,8 @@ void syncTime() {
         delay(2000);
     } else {
         sprintf(lastSyncTimeStr, "Time Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-        tftLog("NTP Sync FAILED.");
-        Serial.println("NTP Sync FAILED.");
+        tftLog("NTP Sync FAILED.",TFT_RED);
+        Serial.printf("NTP Sync FAILED.");
         delay(2000);
         tft.fillScreen(BG_COLOR);
         tft.drawString("NTP Sync Failed", 120, 80);
@@ -415,7 +399,7 @@ bool fetchWeather() {
     const char* CITY_CODE = "120104";
     
     if (!wifi_connected) {
-        Serial.println("DEBUG: fetchWeather() called, but wifi_connected is false.");
+        Serial.printf("DEBUG: fetchWeather() called, but wifi_connected is false.");
         strcpy(lastWeatherSyncStr, "No WiFi");
         return false;
     }
@@ -427,8 +411,8 @@ bool fetchWeather() {
     tft_log_y = 40;
 
     strcpy(lastWeatherSyncStr, "Fetching...");
-    tftLog("Attempting to fetch weather...");
-    Serial.println("DEBUG: Attempting to fetch weather...");
+    tftLog("Attempting to fetch weather...",TFT_YELLOW);
+    Serial.printf("DEBUG: Attempting to fetch weather...");
     
     WiFiClient client;
     HTTPClient http;
@@ -445,7 +429,7 @@ bool fetchWeather() {
 
         char log_buffer[100];
         sprintf(log_buffer, "Attempt %d/5...", i + 1);
-        tftLog(log_buffer);
+        tftLog(log_buffer,TFT_YELLOW);
 
         if (http.begin(client, url)) {
             http.setTimeout(15000);
@@ -453,29 +437,29 @@ bool fetchWeather() {
             http.addHeader("Connection", "close");
 
             sprintf(log_buffer, "Sending HTTP GET request...");
-            tftLog(log_buffer);
+            tftLog(log_buffer,TFT_YELLOW);
             
             int httpCode = http.GET();
             
             if (httpCode > 0) {
                 sprintf(log_buffer, "HTTP Code: %d", httpCode);
-                tftLog(log_buffer);
+                tftLog(log_buffer,TFT_YELLOW);
 
                 if (httpCode == HTTP_CODE_OK) {
                     success = true;
                     String payload = http.getString();
-                    tftLog("HTTP Success!");
+                    tftLog("HTTP Success!",TFT_GREEN);
                     
                     temperature_str = getValue(payload, "\"temperature\":\"", "\"");
                     humidity_str = getValue(payload, "\"humidity\":\"", "\"");
                     reporttime_str = getValue(payload, "\"reporttime\":\"", "\"");
 
                     if (temperature_str != "N/A") {
-                        tftLog("Parse SUCCESS.");
+                        tftLog("Parse SUCCESS.",TFT_GREEN);
                         sprintf(lastWeatherSyncStr, "Weather Success at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
                     } else {
                         success = false;
-                        tftLog("Parse FAILED. Invalid JSON?");
+                        tftLog("Parse FAILED. Invalid JSON",TFT_RED);
                         sprintf(lastWeatherSyncStr, "Parse Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
                     }
                     
@@ -483,15 +467,15 @@ bool fetchWeather() {
                     break; 
                 } else {
                     sprintf(log_buffer, "HTTP Error: %s", http.errorToString(httpCode).c_str());
-                    tftLog(log_buffer);
+                    tftLog(log_buffer,TFT_RED);
                 }
             } else {
                 sprintf(log_buffer, "HTTP Error: %s", http.errorToString(httpCode).c_str());
-                tftLog(log_buffer);
+                tftLog(log_buffer,TFT_RED);
             }
             http.end();
         } else {
-            tftLog("HTTP begin failed");
+            tftLog("HTTP begin failed",TFT_RED);
         }
         delay(500);
     } 
@@ -540,11 +524,11 @@ void silentSyncTime() {
     configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET, ntpServer);
     if (getLocalTime(&timeinfo, 10000)) {
         strftime(lastSyncTimeStr, sizeof(lastSyncTimeStr), "Time Success at %H:%M:%S", &timeinfo);
-        Serial.println("Silent time sync performed successfully.");
+        Serial.printf("Silent time sync performed successfully.");
     }
  else {
         sprintf(lastSyncTimeStr, "Failed at %02d:%02d:%02d, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec");
-        Serial.println("Silent time sync failed.");
+        Serial.printf("Silent time sync failed.");
     }
 }
 
@@ -576,20 +560,20 @@ void silentFetchWeather() {
                 snprintf(humidity, sizeof(humidity), "%s%%", hum_str.c_str());
                 report_str.toCharArray(reporttime, sizeof(reporttime));
                 sprintf(lastWeatherSyncStr, "Weather Success at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-                Serial.println("Silent weather fetch performed successfully.");
+                Serial.printf("Silent weather fetch performed successfully.");
             } else {
                 sprintf(lastWeatherSyncStr, "Weather Parse Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-                Serial.println("Silent weather fetch failed (parsing).");
+                Serial.printf("Silent weather fetch failed (parsing).");
             }
         } else {
             sprintf(lastWeatherSyncStr, "Weather HTTP Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-            Serial.println("Silent weather fetch failed (HTTP).");
+            Serial.printf("Silent weather fetch failed (HTTP).");
         }
         http.end();
     }
  else {
         sprintf(lastWeatherSyncStr, "Weather connection Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-        Serial.println("Silent weather fetch failed (connection).");
+        Serial.printf("Silent weather fetch failed (connection).");
     }
 }
 

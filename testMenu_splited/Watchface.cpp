@@ -147,6 +147,8 @@ static int g_hourlySongIndex = 0;
 
 static void handleHourlyChime() {
     static unsigned long lastChimeCheck = 0;
+    static unsigned long lastBeepTime = 0;
+    static bool waitingForMusic = false;
 
     // This function will be called frequently from watchface loops.
     // We only run the logic once per second.
@@ -162,17 +164,10 @@ static void handleHourlyChime() {
         g_hourlyMusicTaskHandle = NULL;
     }
 
-    // Sequence from 59:55 to 59:59
-    if (timeinfo.tm_min == 59 && timeinfo.tm_sec >= 55) {
-        if (g_lastChimeSecond != timeinfo.tm_sec) {
-            int freq = 1000 + (timeinfo.tm_sec - 55) * 200; // Increasing pitch
-            tone(BUZZER_PIN, freq, 100);
-            g_lastChimeSecond = timeinfo.tm_sec;
-        }
-    } 
-    // At 00:00, play music
-    else if (timeinfo.tm_min == 0 && timeinfo.tm_sec == 0) {
-        if (g_lastChimeSecond == 59) { // Trigger only once when coming from 59:59
+    // 检查是否在等待播放音乐的状态
+    if (waitingForMusic) {
+        if (millis() - lastBeepTime >= 2000) {
+            // 2秒延迟结束，播放音乐
             tone(BUZZER_PIN, 2500, 150); // Final, highest pitch beep
 
             // If a song is already playing, stop it before starting a new one
@@ -184,14 +179,37 @@ static void handleHourlyChime() {
             g_hourlySongIndex = util_random(numSongs);
             stopBuzzerTask = false; // Reset stop flag
             xTaskCreatePinnedToCore(Buzzer_PlayMusic_Task, "Buzzer_Music_Task", 8192, &g_hourlySongIndex, 1, &g_hourlyMusicTaskHandle, 0);
+            
+            waitingForMusic = false; // 重置状态
         }
+        g_lastChimeSecond = timeinfo.tm_sec;
+        return; // 在等待期间不处理其他逻辑
+    }
+
+    // Sequence from 59:55 to 59:59
+    if (timeinfo.tm_min == 59 && timeinfo.tm_sec >= 55) {
+        if (g_lastChimeSecond != timeinfo.tm_sec) {
+            int freq = 1000;
+            tone(BUZZER_PIN, freq, 100);
+            g_lastChimeSecond = timeinfo.tm_sec;
+            
+            // 如果是最后一次蜂鸣（59秒），设置等待状态
+            if (timeinfo.tm_sec == 59) {
+                waitingForMusic = true;
+                lastBeepTime = millis(); // 记录最后一次蜂鸣的时间
+            }
+        }
+    } 
+    // 原来的整点触发逻辑现在由 waitingForMusic 状态处理
+    else if (timeinfo.tm_min == 0 && timeinfo.tm_sec == 0) {
+        // 这个逻辑现在由 waitingForMusic 状态处理
         g_lastChimeSecond = timeinfo.tm_sec;
     } else {
         // Reset for next hour
         g_lastChimeSecond = -1;
+        waitingForMusic = false; // 确保不在等待状态
     }
 }
-
 // =================================================================================================
 // Common Watchface Logic
 // =================================================================================================
