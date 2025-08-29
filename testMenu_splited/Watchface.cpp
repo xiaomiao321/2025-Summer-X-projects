@@ -14,6 +14,7 @@
 extern TFT_eSPI tft;
 extern TFT_eSprite menuSprite;
 extern void showMenuConfig();
+extern char wifiStatusStr[]; // Added for WiFi status display
 
 // Forward declare all watchface functions
 static void SimpleClockWatchface();
@@ -166,9 +167,9 @@ static void handleHourlyChime() {
 
     // 检查是否在等待播放音乐的状态
     if (waitingForMusic) {
-        if (millis() - lastBeepTime >= 2000) {
+        if (millis() - lastBeepTime >= 3000) {
             // 2秒延迟结束，播放音乐
-            tone(BUZZER_PIN, 2500, 150); // Final, highest pitch beep
+            // tone(BUZZER_PIN, 2500, 150); // Final, highest pitch beep
 
             // If a song is already playing, stop it before starting a new one
             if (g_hourlyMusicTaskHandle != NULL) {
@@ -193,16 +194,13 @@ static void handleHourlyChime() {
             tone(BUZZER_PIN, freq, 100);
             g_lastChimeSecond = timeinfo.tm_sec;
             
-            // 如果是最后一次蜂鸣（59秒），设置等待状态
-            if (timeinfo.tm_sec == 59) {
-                waitingForMusic = true;
-                lastBeepTime = millis(); // 记录最后一次蜂鸣的时间
-            }
         }
     } 
     // 原来的整点触发逻辑现在由 waitingForMusic 状态处理
     else if (timeinfo.tm_min == 0 && timeinfo.tm_sec == 0) {
-        // 这个逻辑现在由 waitingForMusic 状态处理
+        tone(BUZZER_PIN, 3000, 2000);
+        waitingForMusic = true;
+        lastBeepTime = millis(); // 记录最后一次蜂鸣的时间
         g_lastChimeSecond = timeinfo.tm_sec;
     } else {
         // Reset for next hour
@@ -219,10 +217,9 @@ const unsigned long syncInterval = 5 * 60 * 1000; // 5 minutes
 
 static void handlePeriodicSync() {
     if (millis() - lastSyncMillis > syncInterval) {
-        if(wifi_connected) {
-            silentSyncTime();
-            silentFetchWeather();
-        }
+        // silentSyncTime and silentFetchWeather now handle their own WiFi connection
+        silentSyncTime();
+        silentFetchWeather();
         lastSyncMillis = millis();
     }
 }
@@ -264,6 +261,12 @@ static void drawCommonElements() {
     menuSprite.setTextSize(1);
     menuSprite.setTextColor(TFT_YELLOW, TFT_BLACK);
     menuSprite.drawString(lastWeatherSyncStr, 120, tft.height()-25);
+
+    // WiFi Status
+    menuSprite.setTextDatum(BC_DATUM);
+    menuSprite.setTextSize(1);
+    menuSprite.setTextColor(TFT_WHITE, TFT_BLACK); // White for general status
+    menuSprite.drawString(wifiStatusStr, 120, tft.height()-35); // 10 pixels above lastWeatherSyncStr
 }
 
 // =================================================================================================

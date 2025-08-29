@@ -24,6 +24,7 @@ char humidity[10] = "N/A";
 char reporttime[25] = "N/A";
 char lastSyncTimeStr[45] = "Never";
 char lastWeatherSyncStr[45] = "Never";
+char wifiStatusStr[30] = "WiFi: Disconnected"; // Added for real-time status
 
 
 // UI Constants
@@ -48,6 +49,41 @@ void printLocalTime() {
       Serial.printf("Failed to obtain time");
       return;
    }
+}
+
+// New function to ensure WiFi is connected for silent operations
+bool ensureWiFiConnected() {
+    if (WiFi.status() == WL_CONNECTED) {
+        strcpy(wifiStatusStr, "WiFi: Connected");
+        return true;
+    }
+
+    strcpy(wifiStatusStr, "WiFi: Connecting...");
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
+    WiFi.setSleep(false);
+    WiFi.setTxPower(WIFI_POWER_19_5dBm);
+    WiFi.begin(ssid, password);
+
+    unsigned long startAttemptTime = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) { // Try for 10 seconds
+        delay(500); // Small delay to allow connection
+        // Update status string with progress
+        if (millis() % 1000 < 500) {
+            strcpy(wifiStatusStr, "WiFi: Connecting.");
+        } else {
+            strcpy(wifiStatusStr, "WiFi: Connecting..");
+        }
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        strcpy(wifiStatusStr, "WiFi: Connected");
+        return true;
+    } else {
+        strcpy(wifiStatusStr, "WiFi: Failed");
+        return false;
+    }
 }
 
 bool connectWiFi() {
@@ -200,6 +236,7 @@ bool connectWiFi() {
         // 获取详细的网络信息
         tftLog("WiFi CONNECTED!",TFT_GREEN);
         Serial.printf("WiFi CONNECTED!");
+        strcpy(wifiStatusStr, "WiFi: Connected"); // Update status string
         
         sprintf(log_buffer, "IP: %s", WiFi.localIP().toString().c_str());
         tftLog(log_buffer,TFT_GREEN);
@@ -513,7 +550,10 @@ bool fetchWeather() {
 }
 
 void silentSyncTime() {
-    if (WiFi.status() != WL_CONNECTED) return;
+    if (!ensureWiFiConnected()) { // Ensure WiFi is connected
+        strcpy(lastSyncTimeStr, "Time Sync Failed (No WiFi)");
+        return;
+    }
 
     tft.setTextSize(1);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
@@ -533,7 +573,10 @@ void silentSyncTime() {
 }
 
 void silentFetchWeather() {
-    if (WiFi.status() != WL_CONNECTED) return;
+    if (!ensureWiFiConnected()) { // Ensure WiFi is connected
+        strcpy(lastWeatherSyncStr, "Weather Sync Failed (No WiFi)");
+        return;
+    }
 
     tft.setTextSize(1);
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
@@ -578,10 +621,12 @@ void silentFetchWeather() {
 }
 
 void weatherMenu() {
-  connectWiFi();
+  connectWiFi(); // Connect WiFi when entering the menu
   syncTime();
-  if (wifi_connected) {
+  if (wifi_connected) { // Only fetch weather if connected
     fetchWeather();
   }
+  WiFi.disconnect(true, true); // Disconnect WiFi after initial sync
+  strcpy(wifiStatusStr, "WiFi: Disconnected"); // Update status string
   WatchfaceMenu();
 }
