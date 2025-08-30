@@ -43,6 +43,7 @@ const MenuItem menuItems[] = {
     {"Temperature",Temperature},
     {"Animation",Animation},
     {"Games", Games},
+    {"LED", LED},
     {"Countdown", Countdown}, // Placeholder image
     {"Stopwatch", Timer},   // Changed placeholder image
     {"ADC", ADC},      // Added ADC Voltmeter
@@ -149,9 +150,10 @@ void showMenu() {
             case 3: DS18B20Menu(); showMenuConfig(); break;
             case 4: AnimationMenu(); showMenuConfig(); break;
             case 5: GamesMenu(); showMenuConfig(); break;
-            case 6: CountdownMenu(); showMenuConfig(); break; // Changed function name
-            case 7: StopwatchMenu(); showMenuConfig(); break; // Changed function name
-            case 8: ADCMenu(); showMenuConfig(); break;
+            case 6: LEDMenu(); showMenuConfig(); break;
+            case 7: CountdownMenu(); showMenuConfig(); break; // Changed function name
+            case 8: StopwatchMenu(); showMenuConfig(); break; // Changed function name
+            case 9: ADCMenu(); showMenuConfig(); break;
         }
     }
 }
