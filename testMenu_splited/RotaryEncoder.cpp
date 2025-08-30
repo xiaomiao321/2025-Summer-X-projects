@@ -133,17 +133,15 @@ bool readButtonLongPress() {
     float progress = (float)currentHoldTime / longPressThreshold;
     if (progress > 1.0) progress = 1.0; // Cap at 100%
     // Draw progress bar directly on tft (main screen)
-    tft.fillRect(BAR_X, BAR_Y, BAR_WIDTH, BAR_HEIGHT, TFT_BLACK); // Clear bar area
-    tft.drawRect(BAR_X, BAR_Y, BAR_WIDTH, BAR_HEIGHT, TFT_WHITE); // Bar outline
-    tft.fillRect(BAR_X, BAR_Y, (int)(BAR_WIDTH * progress), BAR_HEIGHT, TFT_BLUE); // Filled progress
-
+    menuSprite.fillRect(BAR_X, BAR_Y, BAR_WIDTH, BAR_HEIGHT, TFT_BLACK); // Clear bar area
+    menuSprite.drawRect(BAR_X, BAR_Y, BAR_WIDTH, BAR_HEIGHT, TFT_WHITE); // Bar outline
+    menuSprite.fillRect(BAR_X, BAR_Y, (int)(BAR_WIDTH * progress), BAR_HEIGHT, TFT_BLUE); // Filled progress
+    menuSprite.pushSprite(0,0);
     // Display "Release to Exit" text
-    tft.setTextFont(2);
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.drawString("Release to Exit", tft.width() / 2, TEXT_Y);
-    // No pushSprite here, as we are drawing directly on tft
-
+    // menuSprite.setTextFont(2);
+    // menuSprite.setTextDatum(MC_DATUM);
+    // menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+    // menuSprite.drawString("Release to Exit", tft.width() / 2, TEXT_Y);
     if (!longPressTriggered && (currentHoldTime >= longPressThreshold)) {
       triggered = true;
       longPressTriggered = true; // Prevent multiple triggers for one long press
@@ -151,7 +149,8 @@ bool readButtonLongPress() {
   } else { // Button is not pressed
     // Clear progress bar and text when button is released
     if (buttonPressStartTime != 0) { // Only clear if it was previously pressed
-      tft.fillRect(BAR_X - 5, TEXT_Y - 5, BAR_WIDTH + 10, BAR_HEIGHT + 30, TFT_BLACK); // Clear the entire area
+      menuSprite.fillRect(BAR_X - 5, TEXT_Y - 5, BAR_WIDTH + 10, BAR_HEIGHT + 30, TFT_BLACK); // Clear the entire area
+      menuSprite.pushSprite(0,0);
     }
     buttonPressStartTime = 0; // Reset start time
     longPressTriggered = false; // Reset long press flag
