@@ -18,20 +18,23 @@ double vImag[SAMPLES];
 double spectrum[NUM_BANDS];
 
 
-
+// 0-4
 const Song songs[] PROGMEM= {
-  { "cai_bu_tou", melody_cai_bu_tou, durations_cai_bu_tou, sizeof(melody_cai_bu_tou) / sizeof(melody_cai_bu_tou[0]), 0 },
-  { "cheng_du", melody_cheng_du, durations_cheng_du, sizeof(melody_cheng_du)/sizeof(melody_cheng_du[0]), 0 },
-   {"hai kuo tian kong",melody_hai_kuo_tian_kong,durations_hai_kuo_tian_kong, sizeof(melody_hai_kuo_tian_kong)/sizeof(melody_hai_kuo_tian_kong[0]), 0 },
-  { "hong_dou", melody_hong_dou, durations_hong_dou, sizeof(melody_hong_dou)/sizeof(melody_hong_dou[0]), 0 },
-  { "hou_lai", melody_hou_lai, durations_hou_lai, sizeof(melody_hou_lai)/sizeof(melody_hou_lai[0]), 0 },
-  { "kai_shi_dong_le", melody_kai_shi_dong_le, durations_kai_shi_dong_le, sizeof(melody_kai_shi_dong_le)/sizeof(melody_kai_shi_dong_le[0]), 0 },
-  { "lv_se", melody_lv_se, durations_lv_se, sizeof(melody_lv_se)/sizeof(melody_lv_se[0]), 0 },
-  { "qing_hua_ci", melody_qing_hua_ci, durations_qing_hua_ci, sizeof(melody_qing_hua_ci)/sizeof(melody_qing_hua_ci[0]), 0 },
-  { "xin_qiang", melody_xin_qiang, durations_xin_qiang,sizeof(melody_xin_qiang)/sizeof(melody_xin_qiang[0]), 0 },
-  { "you_dian_tian", melody_you_dian_tian, durations_you_dian_tian, sizeof(melody_you_dian_tian)/sizeof(melody_you_dian_tian[0]), 0 },
-   {"Da Hai", melody_da_hai, durations_da_hai, sizeof(melody_da_hai) / sizeof(melody_da_hai[0]), 0}, // Scheme 0
-  {"Happy Birthday", melody_happy_birthday, durations_happy_birthday, sizeof(melody_happy_birthday) / sizeof(melody_happy_birthday[0]), 1}, // Scheme 1
+  { "Cai Bu Tou", melody_cai_bu_tou, durations_cai_bu_tou, sizeof(melody_cai_bu_tou) / sizeof(melody_cai_bu_tou[0]), 0 },
+  {"Chun Jiao Yu Zhi Ming",melody_chun_jiao_yu_zhi_ming,durations_chun_jiao_yu_zhi_ming,sizeof(melody_chun_jiao_yu_zhi_ming)/sizeof(melody_chun_jiao_yu_zhi_ming[0]),1},
+  { "Cheng Du", melody_cheng_du, durations_cheng_du, sizeof(melody_cheng_du)/sizeof(melody_cheng_du[0]), 2 },
+  {"Hai Kuo Tian Kong",melody_hai_kuo_tian_kong,durations_hai_kuo_tian_kong, sizeof(melody_hai_kuo_tian_kong)/sizeof(melody_hai_kuo_tian_kong[0]), 3 },
+  { "Hong Dou", melody_hong_dou, durations_hong_dou, sizeof(melody_hong_dou)/sizeof(melody_hong_dou[0]), 4 },
+  { "Hou Lai", melody_hou_lai, durations_hou_lai, sizeof(melody_hou_lai)/sizeof(melody_hou_lai[0]), 0 },
+  { "Kai Shi Dong Le", melody_kai_shi_dong_le, durations_kai_shi_dong_le, sizeof(melody_kai_shi_dong_le)/sizeof(melody_kai_shi_dong_le[0]), 1 },
+  { "Lv Se", melody_lv_se, durations_lv_se, sizeof(melody_lv_se)/sizeof(melody_lv_se[0]), 2 },
+  { "Qing Hua Ci", melody_qing_hua_ci, durations_qing_hua_ci, sizeof(melody_qing_hua_ci)/sizeof(melody_qing_hua_ci[0]), 3 },
+  { "Xin Qiang", melody_xin_qiang, durations_xin_qiang,sizeof(melody_xin_qiang)/sizeof(melody_xin_qiang[0]), 4 },
+  { "You Dian Tian", melody_you_dian_tian, durations_you_dian_tian, sizeof(melody_you_dian_tian)/sizeof(melody_you_dian_tian[0]), 0 },
+  {"Da Hai", melody_da_hai, durations_da_hai, sizeof(melody_da_hai) / sizeof(melody_da_hai[0]), 1}, 
+  {"Happy Birthday", melody_happy_birthday, durations_happy_birthday, sizeof(melody_happy_birthday) / sizeof(melody_happy_birthday[0]), 2}, 
+  {"Windows XP",melody_windows,durations_windows,sizeof(melody_windows) / sizeof(melody_windows[0]),3
+  },
 };
 const int numSongs = sizeof(songs) / sizeof(songs[0]);
 
@@ -188,12 +191,12 @@ void displaySongList(int selectedIndex) {
   tft.println("Song Menu");
   tft.setTextSize(1);
   tft.setCursor(10, 30);
-  time_t now;
-  time(&now);
-  char timeStr[20];
-  strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M", localtime(&now));
-  tft.print("Time: ");
-  tft.print(timeStr);
+  // time_t now;
+  // time(&now);
+  // char timeStr[20];
+  // strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M", localtime(&now));
+  // tft.print("Time: ");
+  // tft.print(timeStr);
 
   tft.setTextWrap(true);
   for (int i = 0; i < visibleSongs; i++) {

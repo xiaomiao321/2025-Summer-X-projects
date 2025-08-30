@@ -117,7 +117,7 @@ bool readButtonLongPress() {
 
   // Progress bar drawing variables
   static const int BAR_X = 50;
-  static const int BAR_Y = 200;
+  static const int BAR_Y = 30;
   static const int BAR_WIDTH = 140;
   static const int BAR_HEIGHT = 10;
   static const int TEXT_Y = BAR_Y - 20;
@@ -132,8 +132,6 @@ bool readButtonLongPress() {
     unsigned long currentHoldTime = millis() - buttonPressStartTime;
     float progress = (float)currentHoldTime / longPressThreshold;
     if (progress > 1.0) progress = 1.0; // Cap at 100%
-    if(currentHoldTime>1000)
-    {
     // Draw progress bar directly on tft (main screen)
     tft.fillRect(BAR_X, BAR_Y, BAR_WIDTH, BAR_HEIGHT, TFT_BLACK); // Clear bar area
     tft.drawRect(BAR_X, BAR_Y, BAR_WIDTH, BAR_HEIGHT, TFT_WHITE); // Bar outline
@@ -144,7 +142,6 @@ bool readButtonLongPress() {
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.drawString("Release to Exit", tft.width() / 2, TEXT_Y);
-    };
     // No pushSprite here, as we are drawing directly on tft
 
     if (!longPressTriggered && (currentHoldTime >= longPressThreshold)) {

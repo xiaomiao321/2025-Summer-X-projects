@@ -14,7 +14,7 @@
 #include "DS18B20.h"
 #include "System.h"
 #include "ADC.h"
-
+#include "img.h"
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 240
 extern DallasTemperature sensors;
@@ -157,8 +157,74 @@ void hardwareTestTypewriter(int startY) {
 
 // 开机动画函数
 void bootAnimation() {
+    // tft.fillScreen(TFT_BLACK);
+    const uint16_t* boot_gif[16] = {huaji_0,huaji_1,huaji_2,huaji_3,huaji_4,huaji_5,huaji_6,huaji_7,huaji_8,huaji_9,huaji_10,huaji_11,huaji_12,huaji_13,huaji_14,huaji_15};
+    for(int i = 0;i<16;i++)
+    {
+        menuSprite.fillScreen(TFT_WHITE);
+        menuSprite.pushImage(46,45,150,148,boot_gif[i]);
+        menuSprite.pushSprite(0, 0);
+        delay(50);
+    }
+    for(int i = 0;i<16;i++)
+    {
+        menuSprite.fillScreen(TFT_WHITE);
+        menuSprite.pushImage(46,45,150,148,boot_gif[i]);
+        menuSprite.pushSprite(0, 0);
+        delay(50);
+    }
+    for(int i = 0;i<16;i++)
+    {
+        menuSprite.fillScreen(TFT_WHITE);
+        menuSprite.pushImage(46,45,150,148,boot_gif[i]);
+        menuSprite.pushSprite(0, 0);
+        delay(50);
+    }
+    // for(int i = 0;i<16;i++)
+    // {
+    //     menuSprite.fillScreen(TFT_WHITE);
+    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
+    //     menuSprite.pushSprite(0, 0);
+    //     delay(50);
+    // }
+    // for(int i = 0;i<16;i++)
+    // {
+    //     menuSprite.fillScreen(TFT_WHITE);
+    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
+    //     menuSprite.pushSprite(0, 0);
+    //     delay(50);
+    // }
+    // for(int i = 0;i<16;i++)
+    // {
+    //     menuSprite.fillScreen(TFT_WHITE);
+    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
+    //     menuSprite.pushSprite(0, 0);
+    //     delay(50);
+    // }
+    // for(int i = 0;i<16;i++)
+    // {
+    //     menuSprite.fillScreen(TFT_WHITE);
+    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
+    //     menuSprite.pushSprite(0, 0);
+    //     delay(50);
+    // }
+    // for(int i = 0;i<16;i++)
+    // {
+    //     menuSprite.fillScreen(TFT_WHITE);
+    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
+    //     menuSprite.pushSprite(0, 0);
+    //     delay(50);
+    // }
+    // for(int i = 0;i<16;i++)
+    // {
+    //     menuSprite.fillScreen(TFT_WHITE);
+    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
+    //     menuSprite.pushSprite(0, 0);
+    //     delay(50);
+    // }
     tft.fillScreen(TFT_BLACK);
-    
+    // tft.pushImage(46,45,150,148,boot_gif[0]);
+    // delay(100000);
     // 显示标题
     typeWriterEffect("SYSTEM BOOT SEQUENCE", 20, 5, TFT_GREEN, 50);
     tft.drawFastHLine(0, 25, SCREEN_WIDTH, TFT_DARKGREEN);

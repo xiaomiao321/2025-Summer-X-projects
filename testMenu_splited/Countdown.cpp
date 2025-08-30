@@ -1,94 +1,133 @@
 #include "Countdown.h"
-#include "Menu.h" // To return to the main menu (though not directly used for exit here)
-#include "Buzzer.h" // For sound feedback
-#include "RotaryEncoder.h" // For readButtonLongPress
+#include "Menu.h"
+#include "Buzzer.h"
+#include "RotaryEncoder.h"
 
-// Global variables for countdown
+#define LONG_PRESS_DURATION 1500 // milliseconds for long press to exit
+
+// Global variables for countdown state
 static unsigned long countdown_target_millis = 0;
 static unsigned long countdown_start_millis = 0;
 static bool countdown_running = false;
 static bool countdown_paused = false;
 static unsigned long countdown_pause_time = 0;
-
-// Initial countdown duration in seconds (e.g., 5 minutes for testing)
 static long countdown_duration_seconds = 5 * 60; // Default to 5 minutes
 
-// Global variable to track setting mode (0: minutes, 1: seconds)
-static int countdown_setting_mode = 0;
-
+// Global variables for UI control
+static int countdown_setting_mode = 0; // 0: minutes, 1: seconds
 static unsigned long lastClickTime = 0;
 static int clickCount = 0;
-static const unsigned long doubleClickTimeWindow = 300; // milliseconds
+static const unsigned long doubleClickTimeWindow = 300; // ms
 
-// Function to display the countdown time
+// Function to display the countdown time with dynamic layout
+// Added current_hold_duration for long press progress bar
 void displayCountdownTime(unsigned long millis_left) {
-    menuSprite.fillScreen(TFT_BLACK); // Use menuSprite
-    menuSprite.setTextFont(4); // Large font
-    menuSprite.setTextDatum(MC_DATUM); // Middle center alignment
+    menuSprite.fillScreen(TFT_BLACK);
+    menuSprite.setTextDatum(TL_DATUM); // Use Top-Left for precise positioning
 
-    char buf[20];
+    // Time calculation
     unsigned long total_seconds = millis_left / 1000;
     long minutes = total_seconds / 60;
     long seconds = total_seconds % 60;
-    long hundredths = (millis_left % 1000) / 10; // Display hundredths
+    long hundredths = (millis_left % 1000) / 10;
 
-    // When setting the time, we don't want to show hundredths
-    if (!countdown_running && !countdown_paused) {
-        sprintf(buf, "%02ld:%02ld", minutes, seconds);
+    // Font settings for time display
+    menuSprite.setTextFont(7);
+    menuSprite.setTextSize(1);
+
+    // Character width calculation for dynamic positioning
+    int num_w = menuSprite.textWidth("8"); // Use a wide character for consistent spacing
+    int colon_w = menuSprite.textWidth(":");
+    int dot_w = menuSprite.textWidth(".");
+    int num_h = menuSprite.fontHeight();
+
+    // Determine total width based on whether to show hundredths
+    int total_width;
+    bool show_hundredths = (countdown_running || countdown_paused);
+    if (show_hundredths) {
+        total_width = (num_w * 4) + colon_w + dot_w + (num_w * 2);
     } else {
-        sprintf(buf, "%02ld:%02ld.%02ld", minutes, seconds, hundredths);
+        total_width = (num_w * 4) + colon_w;
     }
-    menuSprite.drawString(buf, menuSprite.width() / 2, menuSprite.height() / 2 - 20);
 
-    // Display status
+    // Calculate centered starting position
+    int current_x = (menuSprite.width() - total_width) / 2;
+    int y_pos = (menuSprite.height() / 2) - (num_h / 2) - 20;
+
+    char buf[3];
+
+    // Draw Minutes
+    sprintf(buf, "%02ld", minutes);
+    menuSprite.drawString(buf, current_x, y_pos);
+    current_x += num_w * 2;
+
+    // Draw Colon
+    menuSprite.drawString(":", current_x, y_pos);
+    current_x += colon_w;
+
+    // Draw Seconds
+    sprintf(buf, "%02ld", seconds);
+    menuSprite.drawString(buf, current_x, y_pos);
+    current_x += num_w * 2;
+
+    // Draw Hundredths if the timer is active
+    if (show_hundredths) {
+        menuSprite.drawString(".", current_x, y_pos);
+        current_x += dot_w;
+        sprintf(buf, "%02ld", hundredths);
+        menuSprite.drawString(buf, current_x, y_pos);
+    }
+
+    // --- Display Status Text ---
     menuSprite.setTextFont(2);
     menuSprite.setTextDatum(BC_DATUM);
     if (countdown_running) {
-        menuSprite.drawString("RUNNING", menuSprite.width() / 2, menuSprite.height() - 20);
+        menuSprite.drawString("RUNNING", menuSprite.width() / 2, menuSprite.height() - 80);
     } else if (countdown_paused) {
-        menuSprite.drawString("PAUSED", menuSprite.width() / 2, menuSprite.height() - 20);
-    } else if (millis_left == 0 && !countdown_running && !countdown_paused) {
-        menuSprite.drawString("FINISHED", menuSprite.width() / 2, menuSprite.height() - 20);
-    }
-    else {
-        menuSprite.drawString("READY", menuSprite.width() / 2, menuSprite.height() - 20);
-        // Indicate current setting mode
+        menuSprite.drawString("PAUSED", menuSprite.width() / 2, menuSprite.height() - 80);
+    } else if (millis_left == 0 && countdown_duration_seconds > 0) {
+        menuSprite.drawString("FINISHED", menuSprite.width() / 2, menuSprite.height() - 80);
+    } else {
+        menuSprite.drawString("READY", menuSprite.width() / 2, menuSprite.height() - 80);
         if (countdown_setting_mode == 0) {
-            menuSprite.drawString("MIN", menuSprite.width() / 2, menuSprite.height() - 40);
+            menuSprite.drawString("Set Mins", menuSprite.width() / 2, menuSprite.height() - 40);
         } else {
-            menuSprite.drawString("SEC", menuSprite.width() / 2, menuSprite.height() - 40);
+            menuSprite.drawString("Set Secs", menuSprite.width() / 2, menuSprite.height() - 40);
         }
     }
 
-    // Draw Progress Bar
+    // --- Draw Progress Bar ---
     int bar_x = 20;
     int bar_y = menuSprite.height() / 2 + 40;
     int bar_width = menuSprite.width() - 40;
-    int bar_height = 20; // Made the progress bar wider
+    int bar_height = 20;
 
     float progress = 0.0;
     if (countdown_duration_seconds > 0) {
-        progress = 1.0 - (float)millis_left / (countdown_duration_seconds * 1000); // Calculate progress based on millis
+        progress = 1.0 - (float)millis_left / (countdown_duration_seconds * 1000.0);
     }
+    if (progress < 0) progress = 0;
+    if (progress > 1) progress = 1;
 
-    menuSprite.drawRect(bar_x, bar_y, bar_width, bar_height, TFT_WHITE); // Outline
-    menuSprite.fillRect(bar_x, bar_y, (int)(bar_width * progress), bar_height, TFT_GREEN); // Filled part
+    menuSprite.drawRect(bar_x, bar_y, bar_width, bar_height, TFT_WHITE);
+    menuSprite.fillRect(bar_x + 2, bar_y + 2, (int)((bar_width - 4) * progress), bar_height - 4, TFT_GREEN);
 
-    menuSprite.pushSprite(0, 0); // Push sprite to screen
+    menuSprite.pushSprite(0, 0);
 }
 
 // Main Countdown Menu function
 void CountdownMenu() {
-    // Reset state when entering the menu
     countdown_running = false;
     countdown_paused = false;
     countdown_duration_seconds = 5 * 60; // Reset to default 5 minutes
     countdown_setting_mode = 0; // Start in minutes setting mode
+
     displayCountdownTime(countdown_duration_seconds * 1000);
 
     int encoder_value = 0;
     bool button_pressed = false;
     unsigned long last_display_update_time = millis();
+
 
     while (true) {
         encoder_value = readEncoder();
@@ -99,6 +138,7 @@ void CountdownMenu() {
             tone(BUZZER_PIN, 1500, 100); // Exit sound
             menuSprite.fillScreen(TFT_BLACK); // Clear the screen
             menuSprite.pushSprite(0, 0);
+            menuSprite.setTextFont(1);
             return; // Exit the CountdownMenu function
         }
 

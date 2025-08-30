@@ -49,22 +49,21 @@ struct WatchfaceItem {
 
 const WatchfaceItem watchfaceItems[] = {
     {"Scan", VectorScanWatchface},
-    {"Simple Clock", SimpleClockWatchface},
+    {"Scan_SEG",VectorScanWatchface_SEG},
+    {"Scroll", VectorScrollWatchface},
+    {"Scroll_SEG",VectorScrollWatchface_SEG},
+    {"Progress Bar", ProgressBarWatchface},
     {"Sim Clock", SimClockWatchface},
+    {"Galaxy", GalaxyWatchface},
     {"Terminal Sim", TerminalSimWatchface},
+    {"Simple Clock", SimpleClockWatchface},
     {"Code Rain", CodeRainWatchface},
     {"Snow", SnowWatchface},
     {"Waves", WavesWatchface},
     {"Neno", NenoWatchface},
     {"Bouncing Balls", BallsWatchface},
     {"Sand Box", SandBoxWatchface},
-    {"Progress Bar", ProgressBarWatchface},
-    {"Scroll", VectorScrollWatchface},
     {"3D Cube", Cube3DWatchface},
-    {"Galaxy", GalaxyWatchface},
-    {"Scroll_SEG",VectorScrollWatchface_SEG},
-    {"Scan_SEG",VectorScanWatchface_SEG}
-
 };
 const int WATCHFACE_COUNT = sizeof(watchfaceItems) / sizeof(watchfaceItems[0]);
 
@@ -211,7 +210,7 @@ static void handleHourlyChime() {
     } 
     // 原来的整点触发逻辑现在由 waitingForMusic 状态处理
     else if (timeinfo.tm_min == 0 && timeinfo.tm_sec == 0) {
-        tone(BUZZER_PIN, 3000, 1500);
+        tone(BUZZER_PIN, 3000, 1000);
         waitingForMusic = true;
         lastBeepTime = millis(); // 记录最后一次蜂鸣的时间
         g_lastChimeSecond = timeinfo.tm_sec;
@@ -225,15 +224,20 @@ static void handleHourlyChime() {
 // Common Watchface Logic
 // =================================================================================================
 
-static unsigned long lastSyncMillis = 0;
-const unsigned long syncInterval = 5 * 60 * 1000; // 5 minutes
+static unsigned long lastSyncMillis_Weather = 0;
+static unsigned long lastSyncMillis_Time = 0;
+const unsigned long syncInterval_Weather = 30 * 60 * 1000; // 30 minutes
+const unsigned long syncInterval_Time = 360 * 60 * 1000; // 360 minutes
 
 static void handlePeriodicSync() {
-    if (millis() - lastSyncMillis > syncInterval) {
-        // silentSyncTime and silentFetchWeather now handle their own WiFi connection
-        silentSyncTime();
+    if (millis() - lastSyncMillis_Weather > syncInterval_Weather) {
         silentFetchWeather();
-        lastSyncMillis = millis();
+        lastSyncMillis_Weather = millis();
+    }
+    if (millis() - lastSyncMillis_Time > syncInterval_Time)
+    {
+        silentSyncTime();
+        lastSyncMillis_Time = millis();
     }
 }
 
@@ -318,7 +322,8 @@ static const uint8_t cube_indices[] = {
 };
 
 static void Cube3DWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     static float rot = 0;
     static float rotInc = 1;
     int16_t cube_vertices[8 * 3];
@@ -401,21 +406,15 @@ static void Cube3DWatchface() {
             menuSprite.drawLine(p1[0], p1[1], p2[0], p2[1], TIME_TENTH_COLOR);
         }
 
-        char timeStr[6];
-        sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        char timeStr[20];
+        int tenth = (millis() % 1000) / 100;
+        sprintf(timeStr, "%02d:%02d:%02d.%d", timeinfo.tm_hour, timeinfo.tm_min,timeinfo.tm_sec,tenth);
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(TC_DATUM);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         menuSprite.drawString(timeStr, tft.width()/2, 5);
 
-        char secStr[5];
-        int tenth = (millis() % 1000) / 100;
-        sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
-        menuSprite.setTextDatum(BC_DATUM);
-        menuSprite.setTextSize(3);
-        menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
-        menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -481,7 +480,8 @@ static void galaxy_random_drawStars() {
 }
 
 static void GalaxyWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     for(int i=0; i<50; ++i) {
         galaxy_stars[i].time = 0;
     }
@@ -508,30 +508,25 @@ static void GalaxyWatchface() {
         galaxy_draw_main();
         galaxy_random_drawStars();
 
-        char timeStr[6];
-        sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        char timeStr[20];
+        int tenth = (millis() % 1000) / 100;
+        sprintf(timeStr, "%02d:%02d:%02d.%d", timeinfo.tm_hour, timeinfo.tm_min,timeinfo.tm_sec,tenth);
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(TC_DATUM);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         menuSprite.drawString(timeStr, tft.width()/2, 5);
 
-        char secStr[5];
-        int tenth = (millis() % 1000) / 100;
-        sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
-        menuSprite.setTextDatum(BC_DATUM);
-        menuSprite.setTextSize(3);
-        menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
-        menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
 
         menuSprite.pushSprite(0, 0);
-        vTaskDelay(pdMS_TO_TICKS(30));
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
-static void SimClockWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
 
+static void SimClockWatchface() {
+    // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
         handlePeriodicSync();
         handleHourlyChime();
@@ -573,28 +568,28 @@ static void SimClockWatchface() {
         int minY = centerY + (int)(0.8 * radius * sin(minAngle * M_PI / 180.0));
         menuSprite.drawLine(centerX, centerY, minX, minY, TFT_GREEN);
 
-        // Second hand
-        float secAngle = (timeinfo.tm_sec + (millis() % 1000) / 1000.0) * 6 - 90;
+        // Second hand - FIXED (只使用秒数)
+        float secAngle = timeinfo.tm_sec * 6 - 90;
         int secX = centerX + (int)(0.9 * radius * cos(secAngle * M_PI / 180.0));
         int secY = centerY + (int)(0.9 * radius * sin(secAngle * M_PI / 180.0));
         menuSprite.drawLine(centerX, centerY, secX, secY, TFT_BLUE);
 
         // --- Draw Time ---
-        char timeStr[6];
-        sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-        menuSprite.setTextFont(1);
-        menuSprite.setTextDatum(TC_DATUM);
-        menuSprite.setTextSize(4);
-        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, 5);
+        // char timeStr[6];
+        // sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        // menuSprite.setTextFont(1);
+        // menuSprite.setTextDatum(TC_DATUM);
+        // menuSprite.setTextSize(4);
+        // menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
+        // menuSprite.drawString(timeStr, tft.width()/2, 5);
 
-        char secStr[5];
-        int tenth = (millis() % 1000) / 100;
-        sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
-        menuSprite.setTextDatum(BC_DATUM);
-        menuSprite.setTextSize(3);
-        menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
-        menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
+        // char secStr[5];
+        // int tenth = (millis() % 1000) / 100;
+        // sprintf(secStr, "%02d.%d", timeinfo.tm_sec, tenth);
+        // menuSprite.setTextDatum(BC_DATUM);
+        // menuSprite.setTextSize(3);
+        // menuSprite.setTextColor(TIME_TENTH_COLOR, TFT_BLACK);
+        // menuSprite.drawString(secStr, tft.width()/2, tft.height() - 5);
 
         menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(50)); // Update frequently for smooth second hand
@@ -602,7 +597,8 @@ static void SimClockWatchface() {
 }
 
 static void PlaceholderWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
         handlePeriodicSync();
         handleHourlyChime();
@@ -693,7 +689,8 @@ static void drawVectorScrollTickerNum(TickerData* data) {
 }
 
 static void VectorScrollWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     time_s last_time = {255, 255, 255};
     TickerData tickers[6];
     
@@ -792,7 +789,8 @@ static void VectorScrollWatchface() {
 }
 
 static void VectorScanWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     time_s last_time = {255, 255, 255};
     TickerData tickers[6];
     int num_w = 35, num_h = 50;
@@ -879,7 +877,8 @@ static void VectorScanWatchface() {
 
 // --- Simple Clock ---
 static void SimpleClockWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
         handlePeriodicSync();
         handleHourlyChime();
@@ -929,7 +928,8 @@ int rain_pos[RAIN_COLS];
 int rain_speed[RAIN_COLS];
 
 static void shared_rain_logic(uint16_t color) {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     util_randomSeed(millis());
     for(int i=0; i<RAIN_COLS; i++) {
         rain_pos[i] = util_random_range(0, tft.height());
@@ -993,7 +993,8 @@ static void CodeRainWatchface() { shared_rain_logic(TFT_CYAN); }
 #define SNOW_PARTICLES 100
 std::vector<std::pair<int, int>> snow_particles(SNOW_PARTICLES);
 static void SnowWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     util_randomSeed(millis());
     for(auto& p : snow_particles) { p.first = util_random_range(0, tft.width()); p.second = util_random_range(0, tft.height()); }
     while(1) {
@@ -1046,7 +1047,8 @@ static void SnowWatchface() {
 
 // --- Waves ---
 static void WavesWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     float time = 0;
     while(1) {
         handlePeriodicSync();
@@ -1099,7 +1101,8 @@ static void WavesWatchface() {
 
 // --- Neno (Neon Lines) ---
 static void NenoWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     float time = 0;
     while(1) {
         handlePeriodicSync();
@@ -1155,7 +1158,8 @@ struct Ball { float x, y, vx, vy; uint16_t color; };
 std::vector<Ball> balls(BALL_COUNT);
 
 static void BallsWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     util_randomSeed(millis());
     for(auto& b : balls) {
         b.x = util_random_range(10, tft.width()-10); b.y = util_random_range(10, tft.height()-10);
@@ -1217,7 +1221,8 @@ static void BallsWatchface() {
 byte sand_grid[SAND_WIDTH][SAND_HEIGHT] = {0};
 
 static void SandBoxWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
         handlePeriodicSync();
         handleHourlyChime();
@@ -1284,7 +1289,8 @@ static void SandBoxWatchface() {
 #define PB_PERCENTAGE_TEXT_X (PB_DATA_X + PB_BAR_WIDTH + 10)
 
 static void ProgressBarWatchface() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
         handlePeriodicSync();
         handleHourlyChime();
@@ -1370,7 +1376,8 @@ static void ProgressBarWatchface() {
 #define COLON_FONT 7       // 冒号字体编号
 #define COLON_SIZE 1       // 冒号字体大小倍数
 static void VectorScrollWatchface_SEG() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     static time_s last_time = {255, 255, 255};
     static TickerData tickers[6]; // HHMMSS
     static bool firstRun = true;
@@ -1423,7 +1430,7 @@ static void VectorScrollWatchface_SEG() {
             menuSprite.setTextSize(COLON_SIZE);
             colon_w = menuSprite.textWidth(":");
             
-            int total_width = (hour_num_w * 2) + colon_w + (min_num_w * 2) + colon_w + (sec_num_w * 2) + 20; // Added some padding
+            int total_width = (hour_num_w * 2) + colon_w + (min_num_w * 2) + colon_w + (sec_num_w * 2) + 30; // Added some padding
             int start_x = (menuSprite.width() - total_width) / 2;
             y_main = (menuSprite.height() - hour_num_h) / 2;
 
@@ -1456,6 +1463,7 @@ static void VectorScrollWatchface_SEG() {
         last_time = g_watchface_timeDate.time;
 
         menuSprite.fillSprite(TFT_BLACK);
+        menuSprite.setTextFont(1);
         drawCommonElements();
         menuSprite.setTextDatum(TL_DATUM);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
@@ -1506,7 +1514,8 @@ static void VectorScrollWatchface_SEG() {
 }
 
 static void VectorScanWatchface_SEG() {
-    lastSyncMillis = millis() - syncInterval - 1;
+    // lastSyncMillis_Weather = millis() - syncInterval - 1;
+    // lastSyncMillis_Time = millis() - syncInterval - 1;
     static time_s last_time = {255, 255, 255};
     static TickerData tickers[6]; // HHMMSS
     static bool firstRun = true;

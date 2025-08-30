@@ -59,31 +59,31 @@ bool ensureWiFiConnected() {
     }
 
     strcpy(wifiStatusStr, "WiFi: Connecting...");
-    WiFi.mode(WIFI_STA);
-    WiFi.setAutoReconnect(true);
-    WiFi.persistent(true);
-    WiFi.setSleep(false);
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
-    WiFi.begin(ssid, password);
+    // WiFi.mode(WIFI_STA);
+    // WiFi.setAutoReconnect(true);
+    // WiFi.persistent(true);
+    // WiFi.setSleep(false);
+    // WiFi.setTxPower(WIFI_POWER_19_5dBm);
+    // WiFi.begin(ssid, password);
 
-    unsigned long startAttemptTime = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) { // Try for 10 seconds
-        delay(500); // Small delay to allow connection
-        // Update status string with progress
-        if (millis() % 1000 < 500) {
-            strcpy(wifiStatusStr, "WiFi: Connecting.");
-        } else {
-            strcpy(wifiStatusStr, "WiFi: Connecting..");
-        }
-    }
+    // unsigned long startAttemptTime = millis();
+    // while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) { // Try for 10 seconds
+    //     delay(500); // Small delay to allow connection
+    //     // Update status string with progress
+    //     if (millis() % 1000 < 500) {
+    //         strcpy(wifiStatusStr, "WiFi: Connecting.");
+    //     } else {
+    //         strcpy(wifiStatusStr, "WiFi: Connecting..");
+    //     }
+    // }
 
-    if (WiFi.status() == WL_CONNECTED) {
-        strcpy(wifiStatusStr, "WiFi: Connected");
-        return true;
-    } else {
-        strcpy(wifiStatusStr, "WiFi: Failed");
-        return false;
-    }
+    // if (WiFi.status() == WL_CONNECTED) {
+    //     strcpy(wifiStatusStr, "WiFi: Connected");
+    //     return true;
+    // } else {
+    //     strcpy(wifiStatusStr, "WiFi: Failed");
+    //     return false;
+    // }
 }
 
 bool connectWiFi() {

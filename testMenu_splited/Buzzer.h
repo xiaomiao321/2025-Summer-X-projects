@@ -15,6 +15,8 @@
 #include "Music_processed/qing_hua_ci.h"
 #include "Music_processed/xin_qiang.h"
 #include "Music_processed/you_dian_tian.h"
+#include "Music_processed/chun_jiao_yu_zhi_ming.h"
+#include "Music_processed/Windows.h"
 #define BUZZER_PIN 5
 
 // 音阶频率（Hz）
