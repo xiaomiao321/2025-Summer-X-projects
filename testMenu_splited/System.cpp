@@ -157,7 +157,7 @@ void hardwareTestTypewriter(int startY) {
 
 // 开机动画函数
 void bootAnimation() {
-    static int boot_song_index = 13; // "Windows XP"
+    static int boot_song_index = 14; // "Windows XP"
     xTaskCreatePinnedToCore(Buzzer_PlayMusic_Task, "BootSound", 8192, &boot_song_index, 1, NULL, 0);
     // tft.fillScreen(TFT_BLACK);
     const uint16_t* boot_gif[16] = {huaji_0,huaji_1,huaji_2,huaji_3,huaji_4,huaji_5,huaji_6,huaji_7,huaji_8,huaji_9,huaji_10,huaji_11,huaji_12,huaji_13,huaji_14,huaji_15};

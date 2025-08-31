@@ -59,6 +59,7 @@ bool ensureWiFiConnected() {
     }
 
     strcpy(wifiStatusStr, "WiFi: Connecting...");
+    return false;
     // WiFi.mode(WIFI_STA);
     // WiFi.setAutoReconnect(true);
     // WiFi.persistent(true);
