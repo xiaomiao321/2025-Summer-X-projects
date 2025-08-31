@@ -17,20 +17,6 @@ void setup() {
 }
 
 void loop() {
-    if(millis() % 1000 < 500)
-    {
-    menuSprite.setTextDatum(BC_DATUM);
-    menuSprite.setTextSize(1);
-    if(ensureWiFiConnected())
-    {
-        menuSprite.setTextColor(TFT_GREEN, TFT_BLACK); // White for general status
-    }
-    else
-    {
-        menuSprite.setTextColor(TFT_RED,TFT_BLACK);
-    }
-    menuSprite.drawString(wifiStatusStr, 120, tft.height()-35); // 10 pixels above lastWeatherSyncStr
-    menuSprite.setTextColor(TFT_WHITE,TFT_BLACK);
-    }
+
 }
 

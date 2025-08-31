@@ -57,8 +57,7 @@ bool ensureWiFiConnected() {
         strcpy(wifiStatusStr, "WiFi: Connected");
         return true;
     }
-
-    strcpy(wifiStatusStr, "WiFi: Connecting...");
+    strcpy(wifiStatusStr, "WiFi: DisConnected...");
     return false;
     // WiFi.mode(WIFI_STA);
     // WiFi.setAutoReconnect(true);
@@ -627,7 +626,7 @@ void weatherMenu() {
   if (wifi_connected) { // Only fetch weather if connected
     fetchWeather();
   }
-  WiFi.disconnect(true, true); // Disconnect WiFi after initial sync
-  strcpy(wifiStatusStr, "WiFi: Disconnected"); // Update status string
+//   WiFi.disconnect(true, true); // Disconnect WiFi after initial sync
+//   strcpy(wifiStatusStr, "WiFi: Disconnected"); // Update status string
   WatchfaceMenu();
 }
