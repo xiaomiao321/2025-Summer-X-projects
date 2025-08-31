@@ -3,6 +3,7 @@
 #include "Buzzer.h"
 #include <vector>
 #include "Watchface.h"
+#include "MQTT.h"
 #include "RotaryEncoder.h"
 #include "weather.h" 
 #include "img.h"
@@ -98,6 +99,10 @@ void WatchfaceMenu() {
     displayWatchfaceList(selectedIndex, displayOffset);
 
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            return; // Exit WatchfaceMenu
+        }
         int encoderChange = readEncoder();
         if (encoderChange != 0) {
             selectedIndex = (selectedIndex + encoderChange + WATCHFACE_COUNT) % WATCHFACE_COUNT;
@@ -329,6 +334,16 @@ static void Cube3DWatchface() {
     int16_t cube_vertices[8 * 3];
 
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
 
@@ -487,6 +502,16 @@ static void GalaxyWatchface() {
     }
 
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
 
@@ -528,6 +553,16 @@ static void SimClockWatchface() {
     // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
     // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
 
@@ -600,6 +635,16 @@ static void PlaceholderWatchface() {
     // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
     // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -714,6 +759,16 @@ static void VectorScrollWatchface() {
 
 
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -813,6 +868,16 @@ static void VectorScanWatchface() {
 
 
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -880,6 +945,16 @@ static void SimpleClockWatchface() {
     // lastSyncMillis_Weather = millis() - syncInterval - 1;
     // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
 
@@ -937,6 +1012,16 @@ static void shared_rain_logic(uint16_t color) {
         rain_chars[i] = (char)util_random_range(33, 126);
     }
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -998,6 +1083,16 @@ static void SnowWatchface() {
     util_randomSeed(millis());
     for(auto& p : snow_particles) { p.first = util_random_range(0, tft.width()); p.second = util_random_range(0, tft.height()); }
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1051,6 +1146,16 @@ static void WavesWatchface() {
     // lastSyncMillis_Time = millis() - syncInterval - 1;
     float time = 0;
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1105,6 +1210,16 @@ static void NenoWatchface() {
     // lastSyncMillis_Time = millis() - syncInterval - 1;
     float time = 0;
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1167,6 +1282,16 @@ static void BallsWatchface() {
         b.color = util_random(0xFFFF);
     }
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1224,6 +1349,16 @@ static void SandBoxWatchface() {
     // lastSyncMillis_Weather = millis() - syncInterval - 1;
     // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1292,6 +1427,16 @@ static void ProgressBarWatchface() {
     // lastSyncMillis_Weather = millis() - syncInterval - 1;
     // lastSyncMillis_Time = millis() - syncInterval - 1;
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1388,6 +1533,16 @@ static void VectorScrollWatchface_SEG() {
     static int colon_y;
 
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1526,6 +1681,16 @@ static void VectorScanWatchface_SEG() {
     static int colon_y;
 
     while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            if (g_hourlyMusicTaskHandle != NULL) { // Also stop music if playing
+                vTaskDelete(g_hourlyMusicTaskHandle);
+                g_hourlyMusicTaskHandle = NULL;
+                noTone(BUZZER_PIN);
+                stopBuzzerTask = true;
+            }
+            return; // Exit watchface
+        }
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {

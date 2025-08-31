@@ -1,5 +1,6 @@
 #include "Countdown.h"
 #include "Menu.h"
+#include "MQTT.h"
 #include "Buzzer.h"
 #include "RotaryEncoder.h"
 
@@ -130,6 +131,10 @@ void CountdownMenu() {
 
 
     while (true) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            return; // Exit the CountdownMenu function
+        }
         encoder_value = readEncoder();
         button_pressed = readButton();
 

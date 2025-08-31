@@ -30,23 +30,20 @@ int16_t display = INITIAL_X_OFFSET; // Icon initial x-offset
 uint8_t picture_flag = 0;           // Current selected menu item index
 
 // Menu item structure
-struct MenuItem {
-    const char *name;              // Menu item name
-    const uint16_t *image;         // Menu item image
-};
+
 
 // Menu items array
 const MenuItem menuItems[] = {
-    {"Clock", Weather},
-    {"Countdown", Countdown}, // Placeholder image
-    {"Stopwatch", Timer},   // Changed placeholder image
-    {"Music", Music},
-    {"Performance", Performance},
-    {"Temperature",Temperature},
-    {"Animation",Animation},
-    {"Games", Games},
-    {"LED", LED},
-    {"ADC", ADC},      // Added ADC Voltmeter
+    {"Clock", Weather, &weatherMenu},
+    {"Countdown", Countdown, &CountdownMenu},
+    {"Stopwatch", Timer, &StopwatchMenu},
+    {"Music", Music, &BuzzerMenu},
+    {"Performance", Performance, &performanceMenu},
+    {"Temperature",Temperature, &DS18B20Menu},
+    {"Animation",Animation, &AnimationMenu},
+    {"Games", Games, &GamesMenu},
+    {"LED", LED, &LEDMenu},
+    {"ADC", ADC, &ADCMenu},
 };
 const uint8_t MENU_ITEM_COUNT = sizeof(menuItems) / sizeof(menuItems[0]); // Number of menu items
 
@@ -143,17 +140,9 @@ void showMenu() {
         tone(BUZZER_PIN, 2000, 50);
         vTaskDelay(pdMS_TO_TICKS(50)); // Small delay to let the sound play
 
-        switch (picture_flag) {
-            case 0: weatherMenu(); showMenuConfig(); break;
-            case 1: CountdownMenu(); showMenuConfig(); break; // Changed function name
-            case 2: StopwatchMenu(); showMenuConfig(); break; // Changed function name
-            case 3: BuzzerMenu(); showMenuConfig(); break;
-            case 4: performanceMenu(); showMenuConfig(); break;
-            case 5: DS18B20Menu(); showMenuConfig(); break;
-            case 6: AnimationMenu(); showMenuConfig(); break;
-            case 7: GamesMenu(); showMenuConfig(); break;
-            case 8: LEDMenu(); showMenuConfig(); break;
-            case 9: ADCMenu(); showMenuConfig(); break;
+        if (menuItems[picture_flag].action) {
+            menuItems[picture_flag].action();
+            showMenuConfig();
         }
     }
 }

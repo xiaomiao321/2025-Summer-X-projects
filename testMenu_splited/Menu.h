@@ -5,11 +5,21 @@
 #include <TFT_eSPI.h>
 #include "img.h"
 
+// Menu item structure
+struct MenuItem {
+    const char *name;              // Menu item name
+    const uint16_t *image;         // Menu item image
+    void (*action)();              // Function pointer for the menu action
+};
+
 // Forward declarations for global variables
 extern TFT_eSPI tft;
 extern TFT_eSprite menuSprite;
 extern int16_t display;
 extern uint8_t picture_flag;
+extern const MenuItem menuItems[];
+extern const uint8_t MENU_ITEM_COUNT;
+
 
 // Function prototypes for menu logic
 void showMenu();

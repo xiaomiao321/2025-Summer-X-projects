@@ -1,6 +1,7 @@
 #include "Performance.h"
 #include <TFT_eWidget.h>
 #include "Menu.h"
+#include "MQTT.h"
 #include "RotaryEncoder.h"
 // -----------------------------
 // 🔧 配置区
@@ -295,6 +296,13 @@ void performanceMenu() {
   xTaskCreatePinnedToCore(Performance_Task, "Perf_Show", 8192, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(SERIAL_Task, "Serial_Rx", 2048, NULL, 1, NULL, 0);
   while (1) {
+    if (exitSubMenu) {
+        exitSubMenu = false; // Reset flag
+        vTaskDelete(xTaskGetHandle("Perf_Show"));
+        vTaskDelete(xTaskGetHandle("Serial_Rx"));
+        vSemaphoreDelete(xPCDataMutex);
+        break;
+    }
     if (readButton()) {
       vTaskDelete(xTaskGetHandle("Perf_Show"));
       vTaskDelete(xTaskGetHandle("Serial_Rx"));

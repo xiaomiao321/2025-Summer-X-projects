@@ -97,6 +97,11 @@ void Buzzer_PlayMusic_Task(void *pvParameters);
 void Buzzer_Init();
 void BuzzerMenu();
 
+// New functions for direct playback by name
+int findSongIndexByName(const String& name);
+void setSongToPlay(int index);
+void playSpecificSong();
+
 
 
 const int melody_da_hai[]  = {

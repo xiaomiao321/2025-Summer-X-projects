@@ -1,5 +1,6 @@
 #include "weather.h"
 #include "menu.h"
+#include "MQTT.h"
 #include "RotaryEncoder.h"
 #include <sys/time.h>
 #include <time.h>
@@ -621,12 +622,20 @@ void silentFetchWeather() {
 }
 
 void weatherMenu() {
-  connectWiFi(); // Connect WiFi when entering the menu
-  syncTime();
-  if (wifi_connected) { // Only fetch weather if connected
+  if (exitSubMenu) { exitSubMenu = false; return; }
+  
+  bool connected = connectWiFi(); // Connect WiFi when entering the menu
+  if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to connect
+
+  if (connected) {
+    syncTime();
+    if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to sync
+
     fetchWeather();
+    if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to fetch
   }
-//   WiFi.disconnect(true, true); // Disconnect WiFi after initial sync
-//   strcpy(wifiStatusStr, "WiFi: Disconnected"); // Update status string
+  
+  // After all operations, or if connection failed, proceed to the watchface
+  // The watchface itself has an exit loop.
   WatchfaceMenu();
 }

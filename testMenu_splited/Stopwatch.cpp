@@ -1,5 +1,6 @@
 #include "Stopwatch.h"
 #include "Menu.h"
+#include "MQTT.h"
 #include "Buzzer.h"
 #include "RotaryEncoder.h"
 
@@ -93,6 +94,10 @@ void StopwatchMenu() {
 
 
     while (true) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            return; // Exit the StopwatchMenu function
+        }
         button_pressed = readButton();
 
         // Button press handling

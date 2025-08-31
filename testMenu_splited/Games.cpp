@@ -9,6 +9,7 @@
 #include "DS18B20.h"
 #include "animation.h"
 #include "Games.h"
+#include "MQTT.h"
 #include <vector> // For std::vector
 
 // Snake Game Constants
@@ -158,6 +159,10 @@ void GamesMenu() {
     static bool gamesMenuSingleClickPending = false;
 
     while (true) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            return; // Exit GamesMenu
+        }
         int direction = readEncoder();
         if (direction != 0) {
             if (direction == 1) {
@@ -292,6 +297,10 @@ void ConwayGame() {
     const unsigned long UPDATE_INTERVAL = 200; // Update every 200ms
 
     while (true) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            return; // Exit game
+        }
         unsigned long currentTime = millis();
 
         // Auto-run logic
@@ -331,6 +340,10 @@ void tanchisheGame() {
   unsigned long lastGameUpdateTime = millis();
 
   while (true) {
+    if (exitSubMenu) {
+        exitSubMenu = false; // Reset flag
+        return; // Exit game
+    }
     // Input handling
     handleSnakeInput();
 
@@ -494,6 +507,11 @@ void BuzzerTapGame() {
     unsigned long nextToneInterval = random(1000, 3000); // Random interval between 1-3 seconds
 
     while (true) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            noTone(BUZZER_PIN);
+            return; // Exit game
+        }
         unsigned long currentTime = millis();
 
         // Play tone
@@ -561,6 +579,10 @@ void TimeChallengeGame() {
     bool gameEnded = false;
 
     while (true) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            return; // Exit game
+        }
         unsigned long currentTime = millis();
 
         if (!gameEnded) {
@@ -647,6 +669,10 @@ void dinoGame() {
     unsigned long last_obstacle_time = 0;
 
     while (true) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            return; // Exit game
+        }
         // --- Input ---
         if (readButton() && !dino_is_jumping) {
             dino_is_jumping = true;

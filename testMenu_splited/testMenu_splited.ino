@@ -3,13 +3,36 @@
 
 #include "Menu.h"
 #include "System.h"
+#include "MQTT.h" // Include the MQTT header
+#include "weather.h" // For the advanced connectWiFi() function
 
 
 void setup() {
     bootSystem();
+
+    // Establish WiFi connection with detailed feedback on screen
+    connectWiFi(); 
+    
+    // Initialize MQTT, assuming WiFi is now connected
+    // connectMQTT(); 
+    showMenuConfig();
 }
 
 void loop() {
+    // loopMQTT(); // Keep the MQTT client running
+
+    // // Check if a menu navigation was requested via MQTT
+    // if (requestedMenuAction != nullptr) {
+    //     // A menu was requested via MQTT
+    //     void (*actionToRun)() = (void (*)())requestedMenuAction; // Copy to a local, non-volatile variable
+    //     requestedMenuAction = nullptr; // Reset the flag immediately
+        
+    //     actionToRun();      // Execute the requested menu function
+    //     showMenuConfig();   // Redraw the main menu after the submenu exits
+    // } else {
+    //     // No MQTT command, proceed with normal encoder-based menu
+    //     showMenu();
+    // }
     showMenu();
     vTaskDelay(pdMS_TO_TICKS(15));
 }

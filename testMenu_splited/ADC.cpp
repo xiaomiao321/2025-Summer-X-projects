@@ -4,6 +4,7 @@
 #include <TFT_eSPI.h>
 #include <TFT_eWidget.h>
 #include "Menu.h"
+#include "MQTT.h"
 #include "RotaryEncoder.h"
 #include <math.h>
 
@@ -104,6 +105,12 @@ void ADCMenu() {
     xTaskCreatePinnedToCore(ADC_Task, "ADC_Task", 4096, NULL, 1, NULL, 0);
 
     while (1) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            stopADCTask = true; // Signal the background task to stop
+            vTaskDelay(pdMS_TO_TICKS(200)); // Wait for task to stop
+            break;
+        }
         if (readButton()) {
             stopADCTask = true;
             vTaskDelay(pdMS_TO_TICKS(200)); 

@@ -1,7 +1,8 @@
 #include "LED.h"
 #include "RotaryEncoder.h"
 #include <TFT_eSPI.h>
-#include "Menu.h" // For access to menuSprite
+#include "Menu.h"
+#include "MQTT.h" // For access to menuSprite
 #include <Adafruit_NeoPixel.h>
 
 // Initialize the NeoPixel strip
@@ -84,6 +85,10 @@ void LEDMenu() {
     bool needsRedraw = true;
 
     while (true) {
+        if (exitSubMenu) {
+            exitSubMenu = false; // Reset flag
+            break;
+        }
         int encoderChange = readEncoder();
         if (encoderChange != 0) {
             needsRedraw = true;

@@ -6,6 +6,7 @@
 #include "arduinoFFT.h"
 #include <math.h>
 #include "Menu.h"
+#include "MQTT.h"
 // FFT Constants
 #define SAMPLES 256
 #define SAMPLING_FREQUENCY 4000
@@ -131,6 +132,8 @@ int displayOffset = 0; // 滚动偏移
 const int visibleSongs = 3; // 屏幕可见歌曲数
 bool firstDraw = true; // 全局绘制标志
 bool isPaused = false; // Flag to control pause/resume
+
+int songToPlayIndex = -1; // Index for direct playback by name
 
 // Communication struct for LED Task
 typedef struct {
@@ -489,7 +492,75 @@ bool detectDoubleClick() {
   return false;
 }
 
+// --- Functions for direct playback by name ---
+
+void setSongToPlay(int index) {
+  songToPlayIndex = index;
+}
+
+int findSongIndexByName(const String& name) {
+  for (int i = 0; i < numSongs; i++) {
+    if (name.equalsIgnoreCase(String(songs[i].name))) {
+      return i;
+    }
+  }
+  return -1; // Not found
+}
+
+void playSpecificSong() {
+  if (songToPlayIndex < 0 || songToPlayIndex >= numSongs) {
+    return;
+  }
+
+  tft.init();
+  tft.setRotation(1);
+  tft.fillScreen(TFT_BLACK);
+  strip.show();
+  stopBuzzerTask = false;
+  stopLedTask = false;
+  firstDraw = true;
+  isPaused = false;
+
+  Serial.printf("Directly playing song: %s\n", songs[songToPlayIndex].name);
+
+  int tempSongIndex = songToPlayIndex; // Use a local copy for the task
+
+  xTaskCreatePinnedToCore(Buzzer_Task, "Buzzer_Task", 8192, &tempSongIndex, 1, NULL, 0);
+  xTaskCreatePinnedToCore(Led_Task, "Led_Task", 4096, NULL, 1, NULL, 0);
+
+  while (1) {
+    if (exitSubMenu) {
+      exitSubMenu = false;
+      stopBuzzerTask = true;
+      stopLedTask = true;
+      vTaskDelay(pdMS_TO_TICKS(150));
+      return;
+    }
+    if (readButton()) {
+      if (detectDoubleClick()) {
+        Serial.println("Double click detected, returning...");
+        stopBuzzerTask = true;
+        stopLedTask = true;
+        vTaskDelay(pdMS_TO_TICKS(150));
+        return;
+      } else {
+        isPaused = !isPaused;
+        if (isPaused) {
+          Serial.println("Music paused");
+          noTone(BUZZER_PIN);
+          currentLedCommand.effectType = 3;
+          currentLedCommand.color = strip.Color(0, 0, 0);
+        } else {
+          Serial.println("Music resumed");
+        }
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
 // 蜂鸣器菜单函数
+
 void BuzzerMenu() {
   tft.init();
   tft.setRotation(1); // 调整屏幕方向
@@ -508,6 +579,11 @@ select_song:
   displaySongList(selectedSongIndex);
 
   while (1) {
+    if (exitSubMenu) {
+        exitSubMenu = false; // Reset flag
+        stopLedTask = true; // Signal Led_Task to stop
+        return; // Exit to main menu
+    }
     int encoderChange = readEncoder();
     if (encoderChange != 0) {
       selectedSongIndex = (selectedSongIndex + encoderChange + numSongs) % numSongs;
@@ -547,6 +623,14 @@ select_song:
 
   // 播放控制循环
   while (1) {
+    if (exitSubMenu) {
+        exitSubMenu = false; // Reset flag
+        stopBuzzerTask = true;
+        stopLedTask = true; // Signal Led_Task to stop
+        // Wait for tasks to stop (optional but good practice)
+        vTaskDelay(pdMS_TO_TICKS(150)); 
+        return; // Exit to main menu
+    }
     if (readButton()) {
       if (detectDoubleClick()) { // 双击返回主菜单
         Serial.println("双击检测到，返回主菜单");

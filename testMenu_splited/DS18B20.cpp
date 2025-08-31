@@ -1,6 +1,7 @@
 #include "DS18B20.h"
 #include <TFT_eSPI.h>
 #include <TFT_eWidget.h>
+#include "MQTT.h"
 
 // Graph dimensions and position
 #define TEMP_GRAPH_WIDTH  200
@@ -128,6 +129,12 @@ void DS18B20Menu() {
   xTaskCreatePinnedToCore(DS18B20_Task, "DS18B20_Task", 4096, NULL, 1, NULL, 0);
 
   while (1) {
+    if (exitSubMenu) {
+        exitSubMenu = false; // Reset flag
+        stopDS18B20Task = true;
+        vTaskDelay(pdMS_TO_TICKS(150)); // Wait for task to stop
+        break;
+    }
     if (readButton()) {
       stopDS18B20Task = true;
       TaskHandle_t task = xTaskGetHandle("DS18B20_Task");
