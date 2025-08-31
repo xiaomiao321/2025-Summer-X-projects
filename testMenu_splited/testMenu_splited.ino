@@ -11,7 +11,7 @@ void setup() {
     bootSystem();
 
     // Establish WiFi connection with detailed feedback on screen
-    connectWiFi(); 
+    // connectWiFi(); 
     
     // Initialize MQTT, assuming WiFi is now connected
     // connectMQTT(); 

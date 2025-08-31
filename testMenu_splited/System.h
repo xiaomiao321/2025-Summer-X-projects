@@ -18,4 +18,5 @@ void tftLogSuccess(const String& text);
 void tftLogDebug(const String& text);
 void tftLogWithIcon(const String& text, uint16_t color, const char* icon);
 void tftLogProgress(const String& text, int progress, int total);
+void tftClearLog();
 #endif // !SYSTEM_H

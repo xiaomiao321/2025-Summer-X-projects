@@ -10,7 +10,8 @@
 #include <time.h> // For struct tm
 
 #define MENU_FONT 1
-
+#define WEATHER_INTERVAL_MIN 30
+#define TIME_INTERVAL_MIN 360
 
 // --- Time and Date Colors ---
 #define TIME_MAIN_COLOR     TFT_CYAN
@@ -231,8 +232,8 @@ static void handleHourlyChime() {
 
 static unsigned long lastSyncMillis_Weather = 0;
 static unsigned long lastSyncMillis_Time = 0;
-const unsigned long syncInterval_Weather = 30 * 60 * 1000; // 30 minutes
-const unsigned long syncInterval_Time = 360 * 60 * 1000; // 360 minutes
+const unsigned long syncInterval_Weather = WEATHER_INTERVAL_MIN * 60 * 1000; // 30 minutes
+const unsigned long syncInterval_Time = TIME_INTERVAL_MIN * 60 * 1000; // 360 minutes
 
 static void handlePeriodicSync() {
     if (millis() - lastSyncMillis_Weather > syncInterval_Weather) {
@@ -289,7 +290,7 @@ static void drawCommonElements() {
     // WiFi Status
     menuSprite.setTextDatum(BC_DATUM);
     menuSprite.setTextSize(1);
-    if(ensureWiFiConnected())
+    if(wifi_connected)
     {
         menuSprite.setTextColor(TFT_GREEN, TFT_BLACK); // White for general status
     }

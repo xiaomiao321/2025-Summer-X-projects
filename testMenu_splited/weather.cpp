@@ -17,6 +17,20 @@ const char* ntpServer = "ntp.aliyun.com";
 const long GMT_OFFSET_SEC = 8 * 3600;
 const int DAYLIGHT_OFFSET = 0;
 
+enum WiFiConnectionState {
+    WIFI_STATE_IDLE,
+    WIFI_STATE_CONNECTING,
+    WIFI_STATE_CONNECTED,
+    WIFI_STATE_FAILED_TEMP, // Temporary failure, will retry
+    WIFI_STATE_FAILED_PERM // Permanent failure, e.g., wrong credentials
+};
+
+WiFiConnectionState currentWiFiState = WIFI_STATE_IDLE;
+unsigned long wifiConnectAttemptStartMillis = 0;
+const unsigned long WIFI_CONNECT_TIMEOUT_MILLIS = 10000; // 10 seconds timeout for connection attempt
+unsigned long lastWiFiRetryMillis = 0;
+const unsigned long WIFI_RETRY_DELAY_MILLIS = 30000; // 30 seconds delay before retrying after a failure
+
 // Global Variables
 struct tm timeinfo;
 bool wifi_connected = false;
@@ -47,44 +61,77 @@ String getValue(String data, String key, String end) {
 // Helper for on-screen debug logging
 void printLocalTime() {
    if(!getLocalTime(&timeinfo)){
-      Serial.printf("Failed to obtain time");
+      Serial.printf("FAILED to obtain time");
       return;
    }
 }
 
-// New function to ensure WiFi is connected for silent operations
+// Function to ensure WiFi is connected in a non-blocking way
+// Returns true if WiFi is currently connected, false otherwise.
+// Manages connection attempts internally.
 bool ensureWiFiConnected() {
+    // 1. If already connected, update status and return true.
     if (WiFi.status() == WL_CONNECTED) {
-        strcpy(wifiStatusStr, "WiFi: Connected");
+        if (currentWiFiState != WIFI_STATE_CONNECTED) {
+            Serial.println("WiFi connected.");
+            // Modified: Include time in status string
+            sprintf(wifiStatusStr, "WiFi: Connected at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+            wifi_connected = true;
+            currentWiFiState = WIFI_STATE_CONNECTED;
+        }
         return true;
     }
-    strcpy(wifiStatusStr, "WiFi: DisConnected...");
-    return false;
-    // WiFi.mode(WIFI_STA);
-    // WiFi.setAutoReconnect(true);
-    // WiFi.persistent(true);
-    // WiFi.setSleep(false);
-    // WiFi.setTxPower(WIFI_POWER_19_5dBm);
-    // WiFi.begin(ssid, password);
 
-    // unsigned long startAttemptTime = millis();
-    // while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) { // Try for 10 seconds
-    //     delay(500); // Small delay to allow connection
-    //     // Update status string with progress
-    //     if (millis() % 1000 < 500) {
-    //         strcpy(wifiStatusStr, "WiFi: Connecting.");
-    //     } else {
-    //         strcpy(wifiStatusStr, "WiFi: Connecting..");
-    //     }
-    // }
+    // 2. If not connected, manage the connection state machine.
+    switch (currentWiFiState) {
+        case WIFI_STATE_IDLE:
+        case WIFI_STATE_FAILED_TEMP: // If failed temporarily, try again
+            // Add retry delay check here
+            if (currentWiFiState == WIFI_STATE_FAILED_TEMP && millis() - lastWiFiRetryMillis < WIFI_RETRY_DELAY_MILLIS) {
+                // Modified: Include time in status string
+                sprintf(wifiStatusStr, "WiFi: Retrying soon at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                return false; // Not time to retry yet
+            }
 
-    // if (WiFi.status() == WL_CONNECTED) {
-    //     strcpy(wifiStatusStr, "WiFi: Connected");
-    //     return true;
-    // } else {
-    //     strcpy(wifiStatusStr, "WiFi: Failed");
-    //     return false;
-    // }
+            Serial.println("Initiating WiFi connection...");
+            // Modified: Include time in status string
+            sprintf(wifiStatusStr, "WiFi: Connecting at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+            WiFi.mode(WIFI_STA);
+            WiFi.begin(ssid, password); // Non-blocking call
+            wifiConnectAttemptStartMillis = millis();
+            lastWiFiRetryMillis = millis(); // Update last retry time
+            currentWiFiState = WIFI_STATE_CONNECTING;
+            wifi_connected = false; // Not connected yet
+            return false; // Connection in progress
+        
+        case WIFI_STATE_CONNECTING:
+            // Check for timeout
+            if (millis() - wifiConnectAttemptStartMillis > WIFI_CONNECT_TIMEOUT_MILLIS) {
+                Serial.println("WiFi connection timed out.");
+                // Modified: Include time in status string
+                sprintf(wifiStatusStr, "WiFi: Timeout at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                WiFi.disconnect(); // Stop trying for now
+                currentWiFiState = WIFI_STATE_FAILED_TEMP; // Allow retry later
+                wifi_connected = false;
+                lastWiFiRetryMillis = millis(); // Record time of failure
+                return false;
+            }
+            // Still connecting, return false
+            // Modified: Include time in status string
+            sprintf(wifiStatusStr, "WiFi: Connecting at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec); // Keep status updated
+            wifi_connected = false;
+            return false;
+
+        case WIFI_STATE_CONNECTED: // Should have been caught by the first if()
+            return true;
+
+        case WIFI_STATE_FAILED_PERM: // If permanent failure, don't retry automatically
+            // Modified: Include time in status string
+            sprintf(wifiStatusStr, "WiFi: Perm Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+            wifi_connected = false;
+            return false;
+    }
+    return false; // Should not reach here
 }
 
 bool connectWiFi() {
@@ -194,16 +241,16 @@ bool connectWiFi() {
                 Serial.printf("State: IDLE");
                 break;
             case WL_NO_SSID_AVAIL:
-                tftLog("Error: SSID not found", TFT_RED);
-                Serial.printf("Error: SSID not found");
+                tftLog("ERROR: SSID not found", TFT_RED);
+                Serial.printf("ERROR: SSID not found");
                 break;
             case WL_CONNECT_FAILED:
-                tftLog("Error: Connect failed", TFT_RED);
-                Serial.printf("Error: Connection failed");
+                tftLog("ERROR: Connect FAILED", TFT_RED);
+                Serial.printf("ERROR: Connection FAILED");
                 break;
             case WL_CONNECTION_LOST:
-                tftLog("Error: Connection lost", TFT_RED);
-                Serial.printf("Error: Connection lost");
+                tftLog("ERROR: Connection lost", TFT_RED);
+                Serial.printf("ERROR: Connection lost");
                 break;
             case WL_DISCONNECTED:
                 tftLog("State: Disconnected", TFT_YELLOW);
@@ -223,7 +270,8 @@ bool connectWiFi() {
         delay(1500);
         attempts++;
     }
-
+    tft.fillRect(21, tft.height() - 18, 200, 13, TFT_GREEN);
+    tftClearLog();
     tftLog("========= Result =========",TFT_YELLOW);
     Serial.printf("\n=== Connection Result ===");
     
@@ -314,15 +362,15 @@ bool connectWiFi() {
         tft.fillScreen(BG_COLOR);
         tft.setTextSize(2);
         tft.setTextDatum(MC_DATUM);
-        tft.drawString("WiFi Failed", 120, 60);
+        tft.drawString("WiFi FAILED", 120, 60);
         tft.setTextSize(1);
         tft.drawString("Status: " + String(WiFi.status()), 120, 90);
         tft.drawString("Check SSID/Password", 120, 110);
         tft.drawString("Attempts: " + String(attempts), 120, 130);
         
         wifi_connected = false;
-        tftLog("========= WiFi Failed =========",TFT_RED);
-        Serial.printf("=== WiFi Connection Failed ===");
+        // tftLog("========= WiFi FAILED =========",TFT_RED);
+        Serial.printf("=== WiFi Connection FAILED ===");
         delay(2000);
         return false;
     }
@@ -331,7 +379,7 @@ bool connectWiFi() {
 void syncTime() {
     if (!wifi_connected) {
         Serial.printf("WiFi not connected, cannot sync time.");
-        strcpy(lastSyncTimeStr, "No WiFi");
+        sprintf(lastSyncTimeStr, "Time FAILED (No WiFi) at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         tft.fillScreen(BG_COLOR);
         tft.setTextDatum(MC_DATUM);
         tft.setTextSize(2);
@@ -422,12 +470,12 @@ void syncTime() {
         tft.drawString(time_str_buffer, tft.width()/2, tft.height()/2 + 20);
         delay(2000);
     } else {
-        sprintf(lastSyncTimeStr, "Time Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        sprintf(lastSyncTimeStr, "Time FAILED at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         tftLog("NTP Sync FAILED.",TFT_RED);
         Serial.printf("NTP Sync FAILED.");
         delay(2000);
         tft.fillScreen(BG_COLOR);
-        tft.drawString("NTP Sync Failed", 120, 80);
+        tft.drawString("NTP Sync FAILED", 120, 80);
         delay(2000);
     }
 }
@@ -438,7 +486,7 @@ bool fetchWeather() {
     
     if (!wifi_connected) {
         Serial.printf("DEBUG: fetchWeather() called, but wifi_connected is false.");
-        strcpy(lastWeatherSyncStr, "No WiFi");
+        sprintf(lastWeatherSyncStr, "Weather FAILED (No WiFi) at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         return false;
     }
 
@@ -498,28 +546,31 @@ bool fetchWeather() {
                     } else {
                         success = false;
                         tftLog("Parse FAILED. Invalid JSON",TFT_RED);
-                        sprintf(lastWeatherSyncStr, "Parse Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                        sprintf(lastWeatherSyncStr, "Parse FAILED at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
                     }
                     
                     http.end();
                     break; 
                 } else {
-                    sprintf(log_buffer, "HTTP Error: %s", http.errorToString(httpCode).c_str());
+                    sprintf(log_buffer, "HTTP ERROR: %s", http.errorToString(httpCode).c_str());
                     tftLog(log_buffer,TFT_RED);
                 }
             } else {
-                sprintf(log_buffer, "HTTP Error: %s", http.errorToString(httpCode).c_str());
+                sprintf(log_buffer, "HTTP ERROR: %s", http.errorToString(httpCode).c_str());
                 tftLog(log_buffer,TFT_RED);
             }
             http.end();
         } else {
-            tftLog("HTTP begin failed",TFT_RED);
+            tftLog("HTTP begin FAILED",TFT_RED);
         }
         delay(500);
     } 
-    
+    if(success)
+    {
+        tft.fillRect(21, tft.height() - 18, 200, 13, TFT_GREEN);
+    }
     if (!success && strcmp(lastWeatherSyncStr, "Fetching...") == 0) {
-        sprintf(lastWeatherSyncStr, "HTTP Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        sprintf(lastWeatherSyncStr, "weather FAILED (HTTP) at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
     }
 
     delay(2000); 
@@ -542,7 +593,7 @@ bool fetchWeather() {
         tft.drawString(reporttime_str,120,170);
     } else {
         tft.setTextColor(TFT_RED);
-        tft.drawString("Weather Failed", 120, 80);
+        tft.drawString("Weather FAILED", 120, 80);
         tft.setTextSize(2);
         tft.drawString(lastWeatherSyncStr, 120, 110);
     }
@@ -552,7 +603,11 @@ bool fetchWeather() {
 
 void silentSyncTime() {
     if (!ensureWiFiConnected()) { // Ensure WiFi is connected
-        strcpy(lastSyncTimeStr, "Time Sync Failed (No WiFi)");
+        // If ensureWiFiConnected returns false, it means either:
+        // 1. Connection is in progress.
+        // 2. Connection failed (temporarily or permanently).
+        // In either case, we cannot sync time right now.
+        // The status string (wifiStatusStr) is already updated by ensureWiFiConnected().
         return;
     }
 
@@ -568,14 +623,22 @@ void silentSyncTime() {
         Serial.printf("Silent time sync performed successfully.");
     }
  else {
-        sprintf(lastSyncTimeStr, "Failed at %02d:%02d:%02d, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec");
-        Serial.printf("Silent time sync failed.");
+        sprintf(lastSyncTimeStr, "Time FAILED at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec); // Fixed format string
+        Serial.printf("Silent time sync FAILED.");
     }
+    // Disconnect WiFi after silent sync attempt
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    Serial.println("WiFi disconnected after silent time sync.");
 }
 
 void silentFetchWeather() {
     if (!ensureWiFiConnected()) { // Ensure WiFi is connected
-        strcpy(lastWeatherSyncStr, "Weather Sync Failed (No WiFi)");
+        // If ensureWiFiConnected returns false, it means either:
+        // 1. Connection is in progress.
+        // 2. Connection failed (temporarily or permanently).
+        // In either case, we cannot fetch weather right now.
+        // The status string (wifiStatusStr) is already updated by ensureWiFiConnected().
         return;
     }
 
@@ -606,19 +669,23 @@ void silentFetchWeather() {
                 sprintf(lastWeatherSyncStr, "Weather Success at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
                 Serial.printf("Silent weather fetch performed successfully.");
             } else {
-                sprintf(lastWeatherSyncStr, "Weather Parse Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-                Serial.printf("Silent weather fetch failed (parsing).");
+                sprintf(lastWeatherSyncStr, "Weather FAILED (Parse) at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                Serial.printf("Silent weather fetch FAILED (parsing).");
             }
         } else {
-            sprintf(lastWeatherSyncStr, "Weather HTTP Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-            Serial.printf("Silent weather fetch failed (HTTP).");
+            sprintf(lastWeatherSyncStr, "Weather FAILED (HTTP) at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+            Serial.printf("Silent weather fetch FAILED (HTTP).");
         }
         http.end();
     }
  else {
-        sprintf(lastWeatherSyncStr, "Weather connection Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-        Serial.printf("Silent weather fetch failed (connection).");
+        sprintf(lastWeatherSyncStr, "Weather FAILED (Connection) at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        Serial.printf("Silent weather fetch FAILED (connection).");
     }
+    // Disconnect WiFi after silent weather fetch attempt
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    Serial.println("WiFi disconnected after silent weather fetch.");
 }
 
 void weatherMenu() {
@@ -633,9 +700,14 @@ void weatherMenu() {
 
     fetchWeather();
     if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to fetch
+
+    // Disconnect WiFi after initial sync and fetch
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    Serial.println("WiFi disconnected after initial setup.");
   }
   
-  // After all operations, or if connection failed, proceed to the watchface
+  // After all operations, or if connection FAILED, proceed to the watchface
   // The watchface itself has an exit loop.
   WatchfaceMenu();
 }
