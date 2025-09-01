@@ -3,4 +3,5 @@
 void GamesMenu();
 void TimeChallengeGame();
 void dinoGame();
+void flappy_bird_game();
 #endif

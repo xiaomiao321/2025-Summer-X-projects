@@ -110,8 +110,9 @@ struct GameItem {
 const GameItem gameItems[] = {
     {"Conway's Game", Conway, ConwayGame},
     // {"Snake Game", snake, tanchisheGame},
-    {"Buzzer Tap", Sound, BuzzerTapGame},
+    {"Buzzer Tap", bird_big, BuzzerTapGame},
     {"Time Challenge", Timer, TimeChallengeGame},
+    {"Flappy Bird", bird_big, flappy_bird_game}, // Using Dinasor icon as placeholder
     // {"Dino Game", Dinasor, dinoGame}, // Placeholder icon
 };
 const uint8_t GAME_ITEM_COUNT = sizeof(gameItems) / sizeof(gameItems[0]);
@@ -322,166 +323,6 @@ void ConwayGame() {
     }
 }
 
-// --- Placeholder for Snake Game ---
-void initSnakeGame();
-void drawSnake();
-void generateFood();
-void updateSnake();
-void handleSnakeInput();
-void drawGameOver();
-
-void tanchisheGame() {
-  initSnakeGame(); // Initialize game state
-
-  tft.fillScreen(TFT_BLACK); // Clear screen
-  tft.drawRect(SNAKE_START_X - 1, SNAKE_START_Y - 1, SNAKE_GRID_WIDTH * SNAKE_CELL_SIZE + 2, SNAKE_GRID_HEIGHT * SNAKE_CELL_SIZE + 2, TFT_WHITE); // Draw border
-  drawSnake(); // Initial draw of the snake and food
-
-  unsigned long lastGameUpdateTime = millis();
-
-  while (true) {
-    if (exitSubMenu) {
-        exitSubMenu = false; // Reset flag
-        return; // Exit game
-    }
-    // Input handling
-    handleSnakeInput();
-
-    // Game update logic
-    unsigned long currentTime = millis();
-    if (!gameOver && (currentTime - lastGameUpdateTime > SNAKE_GAME_SPEED_MS)) {
-      updateSnake();
-      drawSnake(); // Redraw only after snake state updates
-      lastGameUpdateTime = currentTime;
-    }
-
-    // Game over check and display
-    if (gameOver) {
-      drawGameOver();
-    }
-
-    // Exit condition (double click)
-    if (readButton()) {
-      if (gamesDetectDoubleClick()) {
-        return; // Exit game
-      }
-    }
-    vTaskDelay(pdMS_TO_TICKS(10)); // Small delay for responsiveness
-  }
-}
-
-void initSnakeGame() {
-  snakeBody.clear();
-  for (int i = 0; i < SNAKE_INITIAL_LENGTH; ++i) {
-    snakeBody.push_back({SNAKE_GRID_WIDTH / 2, SNAKE_GRID_HEIGHT / 2 + i}); // Start in middle, moving up
-  }
-  currentDirection = SNAKE_UP;
-  gameOver = false;
-  snakeScore = 0;
-  generateFood();
-}
-
-void drawSnake() {
-  // This version clears the play area first, then redraws everything.
-  // This is the simplest way to fix the "trail" bug.
-  tft.fillRect(SNAKE_START_X, SNAKE_START_Y, SNAKE_GRID_WIDTH * SNAKE_CELL_SIZE, SNAKE_GRID_HEIGHT * SNAKE_CELL_SIZE, TFT_BLACK);
-
-  // Draw food (always redraw to ensure it's visible)
-  tft.fillRect(SNAKE_START_X + food.x * SNAKE_CELL_SIZE, SNAKE_START_Y + food.y * SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, TFT_RED);
-
-  // Draw the entire snake body
-  for (const auto& segment : snakeBody) {
-    tft.fillRect(SNAKE_START_X + segment.x * SNAKE_CELL_SIZE, SNAKE_START_Y + segment.y * SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, SNAKE_CELL_SIZE, TFT_GREEN);
-  }
-
-  // Draw score
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(1);
-  tft.setCursor(10, 10);
-  tft.printf("Score: %d", snakeScore);
-}
-
-void generateFood() {
-  bool foodOnSnake;
-  do {
-    food.x = random(SNAKE_GRID_WIDTH);
-    food.y = random(SNAKE_GRID_HEIGHT);
-    foodOnSnake = false;
-    for (const auto& segment : snakeBody) {
-      if (segment.x == food.x && segment.y == food.y) {
-        foodOnSnake = true;
-        break;
-      }
-    }
-  } while (foodOnSnake);
-}
-
-void updateSnake() {
-  // Move head
-  Point newHead = snakeBody.front();
-  switch (currentDirection) {
-    case SNAKE_UP:    newHead.y--; break;
-    case SNAKE_DOWN:  newHead.y++; break;
-    case SNAKE_LEFT:  newHead.x--; break;
-    case SNAKE_RIGHT: newHead.x++; break;
-  }
-
-  // Collision with walls
-  if (newHead.x < 0 || newHead.x >= SNAKE_GRID_WIDTH ||
-      newHead.y < 0 || newHead.y >= SNAKE_GRID_HEIGHT) {
-    gameOver = true;
-    return;
-  }
-
-  // Collision with self (start from index 1 to avoid checking against the current head)
-  for (size_t i = 1; i < snakeBody.size(); ++i) {
-    if (newHead.x == snakeBody[i].x && newHead.y == snakeBody[i].y) {
-      gameOver = true;
-      return;
-    }
-  }
-
-  snakeBody.insert(snakeBody.begin(), newHead); // Add new head
-
-  // Check if food is eaten
-  if (newHead.x == food.x && newHead.y == food.y) {
-    snakeScore++;
-    generateFood();
-  } else {
-    snakeBody.pop_back(); // Remove tail if no food eaten
-  }
-}
-
-void handleSnakeInput() {
-  int encoderDelta = readEncoder();
-  if (encoderDelta != 0) {
-    if (encoderDelta == 1) { // Clockwise rotation
-      switch (currentDirection) {
-        case SNAKE_UP:    currentDirection = SNAKE_RIGHT; break;
-        case SNAKE_RIGHT: currentDirection = SNAKE_DOWN;  break;
-        case SNAKE_DOWN:  currentDirection = SNAKE_LEFT;  break;
-        case SNAKE_LEFT:  currentDirection = SNAKE_UP;    break;
-      }
-    } else if (encoderDelta == -1) { // Counter-clockwise rotation
-      switch (currentDirection) {
-        case SNAKE_UP:    currentDirection = SNAKE_LEFT;  break;
-        case SNAKE_LEFT:  currentDirection = SNAKE_DOWN;  break;
-        case SNAKE_DOWN:  currentDirection = SNAKE_RIGHT; break;
-        case SNAKE_RIGHT: currentDirection = SNAKE_UP;    break;
-      }
-    }
-  }
-}
-
-void drawGameOver() {
-  tft.setTextColor(TFT_RED, TFT_BLACK);
-  tft.setTextSize(2);
-  tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("GAME OVER") / 2, SCREEN_HEIGHT / 2 - 10);
-  tft.print("GAME OVER");
-  tft.setTextSize(1);
-  tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("Score: ") / 2, SCREEN_HEIGHT / 2 + 10);
-  tft.printf("Score: %d", snakeScore);
-}
 
 
 // --- Buzzer Tap Game Implementation ---
@@ -641,137 +482,160 @@ void TimeChallengeGame() {
     }
 }
 
-// --- Dino Game Implementation ---
-#define DINO_GROUND_Y (SCREEN_HEIGHT - 40)
-#define DINO_X 40
-#define DINO_WIDTH 20
-#define DINO_HEIGHT 20
-#define JUMP_VELOCITY -6
-#define GRAVITY 0.8
 
-struct Obstacle {
-    int x;
-    int width;
-    int height;
-};
+// --- Flappy Bird Game Implementation ---
+// Based on game/main.c
 
-void dinoGame() {
-    tft.fillScreen(TFT_BLACK);
+// Game constants
+#define BIRD_X 40
+#define BIRD_RADIUS 5
+#define GRAVITY 0.3
+#define JUMP_FORCE -4.5
+#define PIPE_WIDTH 20
+#define PIPE_GAP 80
+#define PIPE_SPEED 2
+#define PIPE_INTERVAL 120 // pixels between pipes
 
-    float dino_y = DINO_GROUND_Y - DINO_HEIGHT;
-    float dino_vy = 0;
-    bool dino_is_jumping = false;
-    int dino_score = 0;
-    bool dino_game_over = false;
-    float game_speed = 4.0;
+void flappy_bird_game() {
+    // Game variables
+    float bird_y = SCREEN_HEIGHT / 2;
+    float bird_vy = 0;
+    int pipes_x[2];
+    int pipes_y[2];
+    int score = 0;
+    bool game_over = false;
+    bool start_game = false;
 
-    std::vector<Obstacle> obstacles;
-    unsigned long last_obstacle_time = 0;
+    // Initialize pipes
+    pipes_x[0] = SCREEN_WIDTH;
+    pipes_y[0] = random(40, SCREEN_HEIGHT - 40 - PIPE_GAP);
+    pipes_x[1] = SCREEN_WIDTH + PIPE_INTERVAL + (PIPE_WIDTH / 2);
+    pipes_y[1] = random(40, SCREEN_HEIGHT - 40 - PIPE_GAP);
+
+    unsigned long lastFrameTime = millis();
+    unsigned long lastClickTime = 0;
 
     while (true) {
-        if (exitSubMenu) {
-            exitSubMenu = false; // Reset flag
-            return; // Exit game
-        }
-        // --- Input ---
-        if (readButton() && !dino_is_jumping) {
-            dino_is_jumping = true;
-            dino_vy = JUMP_VELOCITY;
-            tone(BUZZER_PIN, 1500, 50);
-        }
-        
+        // --- Exit Condition ---
         if (readButton()) {
             if (gamesDetectDoubleClick()) {
                 return; // Exit game
             }
+            lastClickTime = millis();
         }
 
-        if (!dino_game_over) {
-            // --- Update ---
-            // Dino physics
-            if (dino_is_jumping) {
-                dino_y += dino_vy;
-                dino_vy += GRAVITY;
-                if (dino_y >= DINO_GROUND_Y - DINO_HEIGHT) {
-                    dino_y = DINO_GROUND_Y - DINO_HEIGHT;
-                    dino_is_jumping = false;
-                    dino_vy = 0;
+        // --- Logic ---
+        if (!start_game) {
+            if (millis() - lastClickTime < 500 && millis() - lastClickTime > 0) {
+                start_game = true;
+                lastClickTime = 0;
+            }
+        } else if (!game_over) {
+            // Frame Rate Control
+            unsigned long currentTime = millis();
+            if (currentTime - lastFrameTime < 30) { // ~33 FPS
+                vTaskDelay(pdMS_TO_TICKS(1));
+                continue;
+            }
+            lastFrameTime = currentTime;
+
+            // Input
+            if (millis() - lastClickTime < 500 && millis() - lastClickTime > 0) {
+                bird_vy = JUMP_FORCE;
+                tone(BUZZER_PIN, 1500, 20);
+                lastClickTime = 0;
+            }
+
+            // Bird Physics
+            bird_vy += GRAVITY;
+            bird_y += bird_vy;
+
+            // Pipe Logic
+            for (int i = 0; i < 2; i++) {
+                pipes_x[i] -= PIPE_SPEED;
+                if (pipes_x[i] < -PIPE_WIDTH) {
+                    pipes_x[i] = SCREEN_WIDTH;
+                    pipes_y[i] = random(40, SCREEN_HEIGHT - 40 - PIPE_GAP);
+                }
+                if (pipes_x[i] + PIPE_WIDTH < BIRD_X && pipes_x[i] + PIPE_WIDTH + PIPE_SPEED >= BIRD_X) {
+                    score++;
+                    tone(BUZZER_PIN, 2500, 20);
                 }
             }
 
-            // Obstacles
-            if (millis() - last_obstacle_time > random(1000, 3000) / (game_speed / 4.0)) {
-                obstacles.push_back({SCREEN_WIDTH, 15, 30});
-                last_obstacle_time = millis();
+            // Collision Detection
+            if (bird_y + BIRD_RADIUS > SCREEN_HEIGHT || bird_y - BIRD_RADIUS < 0) {
+                game_over = true;
             }
-
-            for (auto &obs : obstacles) {
-                obs.x -= game_speed;
-            }
-
-            // Remove off-screen obstacles and increase score
-            for (int i = 0; i < obstacles.size(); ++i) {
-                if (obstacles[i].x < -obstacles[i].width) {
-                    obstacles.erase(obstacles.begin() + i);
-                    dino_score++;
-                    game_speed += 0.1; // Increase speed
-                    i--;
+            for (int i = 0; i < 2; i++) {
+                if (BIRD_X + BIRD_RADIUS > pipes_x[i] && BIRD_X - BIRD_RADIUS < pipes_x[i] + PIPE_WIDTH) {
+                    if (bird_y - BIRD_RADIUS < pipes_y[i] || bird_y + BIRD_RADIUS > pipes_y[i] + PIPE_GAP) {
+                        game_over = true;
+                    }
                 }
             }
-
-            // Collision detection
-            for (const auto &obs : obstacles) {
-                if (DINO_X + DINO_WIDTH > obs.x && DINO_X < obs.x + obs.width &&
-                    dino_y + DINO_HEIGHT > DINO_GROUND_Y - obs.height) {
-                    dino_game_over = true;
-                    tone(BUZZER_PIN, 500, 200);
-                }
+            if (game_over) {
+                tone(BUZZER_PIN, 500, 200);
             }
+        } else { // Game is over
+            if (millis() - lastClickTime < 500 && millis() - lastClickTime > 0) {
+                // Reset game
+                bird_y = SCREEN_HEIGHT / 2;
+                bird_vy = 0;
+                score = 0;
+                pipes_x[0] = SCREEN_WIDTH;
+                pipes_y[0] = random(40, SCREEN_HEIGHT - 40 - PIPE_GAP);
+                pipes_x[1] = SCREEN_WIDTH + PIPE_INTERVAL + (PIPE_WIDTH / 2);
+                pipes_y[1] = random(40, SCREEN_HEIGHT - 40 - PIPE_GAP);
+                game_over = false;
+                start_game = false;
+                lastClickTime = 0;
+            }
+        }
 
+        // --- Drawing (using menuSprite) ---
+        menuSprite.fillSprite(TFT_BLACK); // Clear buffer
+
+        if (!start_game) {
+            menuSprite.setTextSize(2);
+            menuSprite.setCursor(50, SCREEN_HEIGHT / 2 + 10);
+            menuSprite.print("Click to start");
         } else {
-            // Game over state
-            if (readButton()) { // Press button to restart
-                dino_y = DINO_GROUND_Y - DINO_HEIGHT;
-                dino_vy = 0;
-                dino_is_jumping = false;
-                dino_score = 0;
-                dino_game_over = false;
-                game_speed = 4.0;
-                obstacles.clear();
-                last_obstacle_time = millis();
+            // Draw Bird
+            menuSprite.pushImage(BIRD_X - 5, (int)bird_y - 4, 11, 8, bird);
+
+            // Draw Pipes
+            for (int i = 0; i < 2; i++) {
+                menuSprite.fillRect(pipes_x[i], 0, PIPE_WIDTH, pipes_y[i], TFT_GREEN);
+                menuSprite.fillRect(pipes_x[i] - 2, pipes_y[i] - 10, PIPE_WIDTH + 4, 10, TFT_GREEN);
+                menuSprite.fillRect(pipes_x[i], pipes_y[i] + PIPE_GAP, PIPE_WIDTH, SCREEN_HEIGHT - (pipes_y[i] + PIPE_GAP), TFT_GREEN);
+                menuSprite.fillRect(pipes_x[i] - 2, pipes_y[i] + PIPE_GAP, PIPE_WIDTH + 4, 10, TFT_GREEN);
+            }
+
+            // Draw Score
+            menuSprite.setTextSize(2);
+            menuSprite.setCursor(10, 10);
+            menuSprite.printf("Score: %d", score);
+
+            if (game_over) {
+                menuSprite.setTextSize(3);
+                menuSprite.setCursor(40, SCREEN_HEIGHT / 2 - 30);
+                menuSprite.print("Game Over");
+                menuSprite.setTextSize(2);
+                menuSprite.setCursor(50, SCREEN_HEIGHT / 2 + 10);
+                menuSprite.print("Click to restart");
             }
         }
 
-        // --- Draw ---
-        tft.fillScreen(TFT_BLACK);
+        // Common text
+        menuSprite.setTextSize(1);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setCursor(20, 220);
+        menuSprite.print("Click to jump, Double-click to exit");
 
-        // Draw Ground
-        tft.drawLine(0, DINO_GROUND_Y, SCREEN_WIDTH, DINO_GROUND_Y, TFT_WHITE);
+        menuSprite.pushSprite(0, 0); // Push buffer to screen
 
-        // Draw Dino
-        tft.fillRect(DINO_X, dino_y, DINO_WIDTH, DINO_HEIGHT, TFT_GREEN);
-
-        // Draw Obstacles
-        for (const auto &obs : obstacles) {
-            tft.fillRect(obs.x, DINO_GROUND_Y - obs.height, obs.width, obs.height, TFT_RED);
-        }
-
-        // Draw Score
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextSize(1);
-        tft.setCursor(10, 10);
-        tft.printf("Score: %d", dino_score);
-
-        if (dino_game_over) {
-            tft.setTextColor(TFT_RED, TFT_BLACK);
-            tft.setTextSize(2);
-            tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("GAME OVER") / 2, SCREEN_HEIGHT / 2 - 10);
-            tft.print("GAME OVER");
-            tft.setTextSize(1);
-            tft.setCursor(SCREEN_WIDTH / 2 - tft.textWidth("Press to restart") / 2, SCREEN_HEIGHT / 2 + 20);
-            tft.print("Press to restart");
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
+

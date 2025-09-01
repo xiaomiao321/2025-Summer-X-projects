@@ -589,6 +589,29 @@ static void SimClockWatchface() {
         // Draw clock circle
         menuSprite.drawCircle(centerX, centerY, radius, TFT_WHITE);
 
+        // Draw minute tick marks
+        for (int i = 0; i < 60; i++) {
+            if (i % 5 != 0) { // Only draw for non-hour marks
+                float angle = (i * 6 - 90) * M_PI / 180.0;
+                int startX = centerX + (int)((radius - 4) * cos(angle));
+                int startY = centerY + (int)((radius - 4) * sin(angle));
+                int endX = centerX + (int)(radius * cos(angle));
+                int endY = centerY + (int)(radius * sin(angle));
+                menuSprite.drawLine(startX, startY, endX, endY, TFT_DARKGREY);
+            }
+        }
+
+        // Draw hour numbers
+        menuSprite.setTextDatum(MC_DATUM);
+        menuSprite.setTextSize(2);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        for (int i = 1; i <= 12; i++) {
+            float angle = (i * 30 - 90) * M_PI / 180.0;
+            int numX = centerX + (int)((radius - 12) * cos(angle));
+            int numY = centerY + (int)((radius - 12) * sin(angle));
+            menuSprite.drawString(String(i), numX, numY);
+        }
+
         // Draw center dot
         menuSprite.fillCircle(centerX, centerY, 3, TFT_WHITE);
 
