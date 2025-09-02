@@ -255,7 +255,6 @@ void bootAnimation() {
 
 // 系统初始化函数
 void bootSystem() {
-
     // 初始化硬件
     Buzzer_Init();
     initRotaryEncoder();

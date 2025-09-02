@@ -25,6 +25,7 @@ extern TFT_eSPI tft;
 extern TFT_eSprite menuSprite;
 extern void showMenuConfig();
 extern char wifiStatusStr[]; // Added for WiFi status display
+extern DS18B20 ds18b20;
 
 // Forward declare all watchface functions
 static void SimpleClockWatchface();
@@ -38,6 +39,7 @@ static void NenoWatchface();
 static void BallsWatchface();
 static void SandBoxWatchface();
 static void ProgressBarWatchface(); // New watchface
+static void ChargeWatchface();
 static void Cube3DWatchface();
 static void GalaxyWatchface();
 static void SimClockWatchface();
@@ -50,6 +52,7 @@ struct WatchfaceItem {
 };
 
 const WatchfaceItem watchfaceItems[] = {
+    // {"Charge", ChargeWatchface},
     {"Scan", VectorScanWatchface},
     {"Scan_SEG",VectorScanWatchface_SEG},
     {"Scroll", VectorScrollWatchface},
@@ -147,7 +150,16 @@ timeDate_s *timeDate = &g_watchface_timeDate;
 
 static uint32_t util_seed = 1;
 void util_randomSeed(uint32_t newSeed) { util_seed = newSeed; }
-long util_random(long max) { util_seed = (util_seed * 1103515245 + 12345) & 0x7FFFFFFF; return util_seed % max; }
+long util_random(long max) {
+    static bool seeded = false;
+    if (!seeded) {
+        // 组合多种时间源
+        unsigned long seed = millis() + micros();
+        randomSeed(seed);
+        seeded = true;
+    }
+    return random(max);
+}
 long util_random_range(long min, long max) { return min + util_random(max - min); }
 
 void draw_char(int16_t x, int16_t y, char c, uint16_t color, uint16_t bg, uint8_t size) {
@@ -195,7 +207,8 @@ static void handleHourlyChime() {
             }
 
             // Start a random song
-            g_hourlySongIndex = util_random(numSongs);
+            //g_hourlySongIndex = util_random(numSongs);
+            g_hourlySongIndex = timeinfo.tm_hour % 12;
             stopBuzzerTask = false; // Reset stop flag
             xTaskCreatePinnedToCore(Buzzer_PlayMusic_Task, "Buzzer_Music_Task", 8192, &g_hourlySongIndex, 1, &g_hourlyMusicTaskHandle, 0);
             
@@ -290,7 +303,7 @@ static void drawCommonElements() {
     // WiFi Status
     menuSprite.setTextDatum(BC_DATUM);
     menuSprite.setTextSize(1);
-    if(wifi_connected)
+    if(ensureWiFiConnected())
     {
         menuSprite.setTextColor(TFT_GREEN, TFT_BLACK); // White for general status
     }
@@ -305,6 +318,92 @@ static void drawCommonElements() {
 // =================================================================================================
 // WATCHFACE IMPLEMENTATIONS
 // =================================================================================================
+
+
+// The map function, as seen in charge/main.c
+static long mymap(long x, long in_min, long in_max, long out_min, long out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+// Helper to draw a bitmap with a transparent background
+static void drawXBitmap_transparent(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color) {
+  int16_t i, j, byteWidth = (w + 7) / 8;
+  uint8_t b;
+
+  for(j=0; j<h; j++) {
+    for(i=0; i<w; i++) {
+      if(i & 7) b <<= 1;
+      else      b = bitmap[j * byteWidth + i / 8];
+      if(b & 0x80) menuSprite.drawPixel(x+i, y+j, color);
+    }
+  }
+}
+
+// Data from charge/main.c
+static const unsigned char battery_outline[] = {
+    0xfc, 0xfe, 0x7, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x7, 0xfe, 0xfc, 0x0, 0x0, 0x0,
+		0xff, 0xff, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xff, 0xff, 0xf0, 0xf0, 0xe0,
+		0xff, 0xff, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xff, 0xff, 0xf, 0xf, 0x7,
+		0x3f, 0x7f, 0xe0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xe0, 0x7f, 0x3f, 0x0, 0x0, 0x0,
+};
+
+static const unsigned char water_array[30][128] = {
+		{0xfe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,0xff, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,0xff, 0xfe, 0xfc, 0xf8, 0xf0, 0xf0, 0xe0, 0xc0, 0xc0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xc, 0x1e, 0x1e, 0x1e, 0x1c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,0xff, 0xff, 0xff, 0xff, 0x7f, 0x7f, 0x3f, 0x1f, 0x1f, 0x7, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3, 0x7, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0,},
+		{0xfe, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x10, 0x38, 0x10, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,0xff, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,0xff, 0xff, 0xfe, 0xfc, 0xf8, 0xf0, 0xe0, 0xc0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1e, 0x1e, 0x1f, 0x3e, 0x1c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,0xff, 0xff, 0xff, 0xff, 0x7f, 0x3f, 0x3f, 0xf, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3, 0x7, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,},
+        // ... (rest of the water_array data) ...
+};
+
+static void ChargeWatchface() {
+    static int anim_frame = 0;
+    int xoff = (tft.width() - 70) / 2;
+    int yoff = 150;
+
+    while(1) {
+        if (exitSubMenu) {
+            exitSubMenu = false;
+            return;
+        }
+        handlePeriodicSync();
+        handleHourlyChime();
+
+        if (readButton()) {
+            tone(BUZZER_PIN, 1500, 50);
+            menuSprite.setTextFont(MENU_FONT);
+            return;
+        }
+
+        getLocalTime(&timeinfo);
+        menuSprite.fillSprite(TFT_BLACK);
+        drawCommonElements();
+
+        menuSprite.setTextDatum(MC_DATUM);
+        char timeStr[10];
+        sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min,timfo.tm_sec);
+        menuSprite.setTextSize(5);
+        menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
+        menuSprite.drawString(timeStr, tft.width()/2, 115);
+
+        menuSprite.drawXBitmap(xoff, yoff, battery_outline, 70, 40, TFT_WHITE, TFT_BLACK);
+
+        long fill_width = mymap(timeinfo.tm_sec, 0, 59, 0, 64);
+
+        if (fill_width > 0) {
+            menuSprite.fillRect(xoff + 3, yoff + 3, fill_width, 34, TIME_MAIN_COLOR);
+        }
+
+        int water_x = xoff + 3 + fill_width - 16;
+        int water_y = yoff + 4;
+        drawXBitmap_transparent(water_x, water_y, water_array[anim_frame], 32, 32, TFT_CYAN);
+
+        anim_frame = (anim_frame + 1) % 30;
+
+        menuSprite.pushSprite(0, 0);
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
+
 
 
 // --- 3D Cube ---
@@ -412,7 +511,7 @@ static void Cube3DWatchface() {
             y += tft.height() / 2;
 
             vertex[0] = x;
-            vertex[1] = y;
+            vertextex[1] = y;
         }
 
         for(int i=0; i<12; ++i) {
@@ -760,7 +859,7 @@ static void drawVectorScrollTickerNum(TickerData* data) {
 static void VectorScrollWatchface() {
     // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
     // lastSyncMillis_Time = millis() - syncInterval - 1;
-    time_s last_time = {255, 255, 255};
+    time_s last_time;
     TickerData tickers[6];
     
     int num_w = 35, num_h = 50;
@@ -768,18 +867,24 @@ static void VectorScrollWatchface() {
     int start_x = (tft.width() - (num_w * 4 + colon_w * 2 + num_w * 2)) / 2; // Adjusted for 6 digits + 2 colons
     int y_main = (tft.height() - num_h) / 2;
 
+    // Initialize with current time
+    getLocalTime(&timeinfo);
+    last_time.hour = timeinfo.tm_hour;
+    last_time.mins = timeinfo.tm_min;
+    last_time.secs = timeinfo.tm_sec;
+
     // Hour, Minute, Second tickers
-    tickers[0] = {start_x, y_main, num_w, num_h, 0, 2, false, 0};
-    tickers[1] = {start_x + num_w+5, y_main, num_w, num_h, 0, 9, false, 0};
-    tickers[2] = {start_x + num_w*2 + colon_w + 20, y_main, num_w, num_h, 0, 5, false, 0}; // Shifted right
-    tickers[3] = {start_x + num_w*3 + colon_w + 20+5, y_main, num_w, num_h, 0, 9, false, 0}; // Shifted right
+    tickers[0] = {start_x, y_main, num_w, num_h, (uint8_t)(last_time.hour / 10), 2, false, 0};
+    tickers[1] = {start_x + num_w+5, y_main, num_w, num_h, (uint8_t)(last_time.hour % 10), 9, false, 0};
+    tickers[2] = {start_x + num_w*2 + colon_w + 20, y_main, num_w, num_h, (uint8_t)(last_time.mins / 10), 5, false, 0}; // Shifted right
+    tickers[3] = {start_x + num_w*3 + colon_w + 20+5, y_main, num_w, num_h, (uint8_t)(last_time.mins % 10), 9, false, 0}; // Shifted right
     // Seconds are now smaller and below minutes
     int sec_num_w = 20, sec_num_h = 25;
     int sec_x_offset = tickers[3].x + num_w + 5; // Right of last minute digit, slightly back
     int sec_y_offset = y_main + num_h - sec_num_h + 5; // Below minutes
 
-    tickers[4] = {sec_x_offset, sec_y_offset, sec_num_w, sec_num_h, 0, 5, false, 0};
-    tickers[5] = {sec_x_offset + sec_num_w, sec_y_offset, sec_num_w, sec_num_h, 0, 9, false, 0};
+    tickers[4] = {sec_x_offset, sec_y_offset, sec_num_w, sec_num_h, (uint8_t)(last_time.secs / 10), 5, false, 0};
+    tickers[5] = {sec_x_offset + sec_num_w, sec_y_offset, sec_num_w, sec_num_h, (uint8_t)(last_time.secs % 10), 9, false, 0};
 
 
     while(1) {
@@ -870,25 +975,31 @@ static void VectorScrollWatchface() {
 static void VectorScanWatchface() {
     // lastSyncMillis_Weather = millis() - syncInterval_Weather - 1;
     // lastSyncMillis_Time = millis() - syncInterval - 1;
-    time_s last_time = {255, 255, 255};
+    time_s last_time;
     TickerData tickers[6];
     int num_w = 35, num_h = 50;
     int colon_w = 15; // Width for colon spacing
     int start_x = (tft.width() - (num_w * 4 + colon_w * 2 + num_w * 2)) / 2; // Adjusted for 6 digits + 2 colons
     int y_main = (tft.height() - num_h) / 2;
 
+    // Initialize with current time
+    getLocalTime(&timeinfo);
+    last_time.hour = timeinfo.tm_hour;
+    last_time.mins = timeinfo.tm_min;
+    last_time.secs = timeinfo.tm_sec;
+
     // Hour, Minute, Second tickers
-    tickers[0] = {start_x, y_main, num_w, num_h, 0, 2, false, 0};
-    tickers[1] = {start_x + num_w+5, y_main, num_w, num_h, 0, 9, false, 0};
-    tickers[2] = {start_x + num_w*2 + colon_w + 20, y_main, num_w, num_h, 0, 5, false, 0}; // Shifted right
-    tickers[3] = {start_x + num_w*3 + colon_w + 20+5, y_main, num_w, num_h, 0, 9, false, 0}; // Shifted right
+    tickers[0] = {start_x, y_main, num_w, num_h, (uint8_t)(last_time.hour / 10), 2, false, 0};
+    tickers[1] = {start_x + num_w+5, y_main, num_w, num_h, (uint8_t)(last_time.hour % 10), 9, false, 0};
+    tickers[2] = {start_x + num_w*2 + colon_w + 20, y_main, num_w, num_h, (uint8_t)(last_time.mins / 10), 5, false, 0}; // Shifted right
+    tickers[3] = {start_x + num_w*3 + colon_w + 20+5, y_main, num_w, num_h, (uint8_t)(last_time.mins % 10), 9, false, 0}; // Shifted right
     // Seconds are now smaller and below minutes
     int sec_num_w = 20, sec_num_h = 25;
     int sec_x_offset = tickers[3].x + num_w + 5; // Right of last minute digit, slightly back
     int sec_y_offset = y_main + num_h - sec_num_h + 5; // Below minutes
 
-    tickers[4] = {sec_x_offset, sec_y_offset, sec_num_w, sec_num_h, 0, 5, false, 0};
-    tickers[5] = {sec_x_offset + sec_num_w, sec_y_offset, sec_num_w, sec_num_h, 0, 9, false, 0};
+    tickers[4] = {sec_x_offset, sec_y_offset, sec_num_w, sec_num_h, (uint8_t)(last_time.secs / 10), 5, false, 0};
+    tickers[5] = {sec_x_offset + sec_num_w, sec_y_offset, sec_num_w, sec_num_h, (uint8_t)(last_time.secs % 10), 9, false, 0};
 
 
     while(1) {
@@ -1135,7 +1246,7 @@ static void SnowWatchface() {
         menuSprite.fillSprite(TFT_BLACK);
 
         for(auto& p : snow_particles) {
-            p.second += 1;
+            p.seco+= 1;
             if(p.second > tft.height()) { p.second = 0; p.first = util_random_range(0, tft.width()); }
             menuSprite.drawPixel(p.first, p.second, TFT_WHITE);
         }
@@ -1359,7 +1470,7 @@ static void BallsWatchface() {
         menuSprite.setTextSize(1);
         menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
-        menuSprite.pushSprite(0, 0);
+        menuSprite.pushSprite(0, 0);0);
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
@@ -1547,7 +1658,7 @@ static void ProgressBarWatchface() {
 static void VectorScrollWatchface_SEG() {
     // lastSyncMillis_Weather = millis() - syncInterval - 1;
     // lastSyncMillis_Time = millis() - syncInterval - 1;
-    static time_s last_time = {255, 255, 255};
+    static time_s last_time;
     static TickerData tickers[6]; // HHMMSS
     static bool firstRun = true;
 
@@ -1629,6 +1740,7 @@ static void VectorScrollWatchface_SEG() {
             
             colon_y = y_main;
 
+            last_time = g_watchface_timeDate.time;
             firstRun = false;
         }
 
@@ -1695,7 +1807,7 @@ static void VectorScrollWatchface_SEG() {
 static void VectorScanWatchface_SEG() {
     // lastSyncMillis_Weather = millis() - syncInterval - 1;
     // lastSyncMillis_Time = millis() - syncInterval - 1;
-    static time_s last_time = {255, 255, 255};
+    static time_s last_time;
     static TickerData tickers[6]; // HHMMSS
     static bool firstRun = true;
 
@@ -1777,6 +1889,7 @@ static void VectorScanWatchface_SEG() {
             
             colon_y = y_main;
 
+            last_time = g_watchface_timeDate.time;
             firstRun = false;
         }
 
@@ -1824,6 +1937,16 @@ static void VectorScanWatchface_SEG() {
         menuSprite.setTextFont(COLON_FONT);
         menuSprite.setTextSize(COLON_SIZE);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
+        if (millis() % 1000 < 500) {
+            menuSprite.drawString(":", colon1_x, colon_y);
+            menuSprite.drawString(":", colon2_x, colon_y);
+        }
+
+        menuSprite.pushSprite(0, 0);
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         if (millis() % 1000 < 500) {
             menuSprite.drawString(":", colon1_x, colon_y);
             menuSprite.drawString(":", colon2_x, colon_y);

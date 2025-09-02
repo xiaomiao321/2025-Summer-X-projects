@@ -109,7 +109,7 @@ bool ensureWiFiConnected() {
             if (millis() - wifiConnectAttemptStartMillis > WIFI_CONNECT_TIMEOUT_MILLIS) {
                 Serial.println("WiFi connection timed out.");
                 // Modified: Include time in status string
-                sprintf(wifiStatusStr, "WiFi: Timeout at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                sprintf(wifiStatusStr, "WiFi: TIMEOUT at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
                 WiFi.disconnect(); // Stop trying for now
                 currentWiFiState = WIFI_STATE_FAILED_TEMP; // Allow retry later
                 wifi_connected = false;
@@ -127,7 +127,7 @@ bool ensureWiFiConnected() {
 
         case WIFI_STATE_FAILED_PERM: // If permanent failure, don't retry automatically
             // Modified: Include time in status string
-            sprintf(wifiStatusStr, "WiFi: Perm Failed at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+            sprintf(wifiStatusStr, "WiFi: Perm FAILED at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
             wifi_connected = false;
             return false;
     }
@@ -627,8 +627,8 @@ void silentSyncTime() {
         Serial.printf("Silent time sync FAILED.");
     }
     // Disconnect WiFi after silent sync attempt
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
+    // WiFi.disconnect(true);
+    // WiFi.mode(WIFI_OFF);
     Serial.println("WiFi disconnected after silent time sync.");
 }
 
@@ -683,8 +683,8 @@ void silentFetchWeather() {
         Serial.printf("Silent weather fetch FAILED (connection).");
     }
     // Disconnect WiFi after silent weather fetch attempt
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
+    // WiFi.disconnect(true);
+    // WiFi.mode(WIFI_OFF);
     Serial.println("WiFi disconnected after silent weather fetch.");
 }
 

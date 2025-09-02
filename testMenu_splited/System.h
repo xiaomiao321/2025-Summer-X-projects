@@ -6,7 +6,7 @@ extern int tft_log_y;
 extern int current_log_lines;
 const int LOG_MARGIN = 5;
 const int LOG_LINE_HEIGHT = 12;
-const int LOG_MAX_LINES = 16;
+const int LOG_MAX_LINES = 13;
 
 
 void bootSystem();
