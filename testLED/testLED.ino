@@ -1,4 +1,4 @@
-int led = 48;
+int led = 8;
 void setup() {
   pinMode(led, OUTPUT);
 }

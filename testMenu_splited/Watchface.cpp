@@ -8,6 +8,7 @@
 #include "weather.h" 
 #include "img.h"
 #include <time.h> // For struct tm
+#include "DS18B20.h"
 
 #define MENU_FONT 1
 #define WEATHER_INTERVAL_MIN 30
@@ -25,7 +26,6 @@ extern TFT_eSPI tft;
 extern TFT_eSprite menuSprite;
 extern void showMenuConfig();
 extern char wifiStatusStr[]; // Added for WiFi status display
-extern DS18B20 ds18b20;
 
 // Forward declare all watchface functions
 static void SimpleClockWatchface();
@@ -300,6 +300,15 @@ static void drawCommonElements() {
     menuSprite.setTextColor(TFT_YELLOW, TFT_BLACK);
     menuSprite.drawString(lastWeatherSyncStr, 120, tft.height()-25);
 
+    // DS18B20 Temperature
+    menuSprite.setTextDatum(BC_DATUM);
+    menuSprite.setTextFont(1);
+    menuSprite.setTextSize(1);
+    float temp = getDS18B20Temp();
+    String tempStr = "DS18B20: " + String(temp, 1) + " C";
+    menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+    menuSprite.drawString(tempStr, 120, tft.height() - 45);
+
     // WiFi Status
     menuSprite.setTextDatum(BC_DATUM);
     menuSprite.setTextSize(1);
@@ -379,7 +388,7 @@ static void ChargeWatchface() {
 
         menuSprite.setTextDatum(MC_DATUM);
         char timeStr[10];
-        sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min,timfo.tm_sec);
+        sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min,timeinfo.tm_sec);
         menuSprite.setTextSize(5);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         menuSprite.drawString(timeStr, tft.width()/2, 115);
@@ -511,7 +520,7 @@ static void Cube3DWatchface() {
             y += tft.height() / 2;
 
             vertex[0] = x;
-            vertextex[1] = y;
+            vertex[1] = y;
         }
 
         for(int i=0; i<12; ++i) {
@@ -1246,7 +1255,7 @@ static void SnowWatchface() {
         menuSprite.fillSprite(TFT_BLACK);
 
         for(auto& p : snow_particles) {
-            p.seco+= 1;
+            p.second += 1;
             if(p.second > tft.height()) { p.second = 0; p.first = util_random_range(0, tft.width()); }
             menuSprite.drawPixel(p.first, p.second, TFT_WHITE);
         }
@@ -1470,7 +1479,7 @@ static void BallsWatchface() {
         menuSprite.setTextSize(1);
         menuSprite.drawString(String(tenth), timeX + timeWidth/2 + 10, timeY + 10);
 
-        menuSprite.pushSprite(0, 0);0);
+        menuSprite.pushSprite(0, 0);
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
@@ -1946,14 +1955,3 @@ static void VectorScanWatchface_SEG() {
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
-         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
-        if (millis() % 1000 < 500) {
-            menuSprite.drawString(":", colon1_x, colon_y);
-            menuSprite.drawString(":", colon2_x, colon_y);
-        }
-
-        menuSprite.pushSprite(0, 0);
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}
-    

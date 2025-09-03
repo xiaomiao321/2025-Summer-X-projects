@@ -15,6 +15,8 @@
 #include "System.h"
 #include "ADC.h"
 #include "img.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 240
 extern DallasTemperature sensors;
@@ -258,6 +260,8 @@ void bootSystem() {
     // 初始化硬件
     Buzzer_Init();
     initRotaryEncoder();
+    DS18B20_Init();
+    createDS18B20Task();
     tft.init();
     tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);

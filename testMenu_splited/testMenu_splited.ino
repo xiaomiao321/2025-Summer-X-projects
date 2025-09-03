@@ -6,6 +6,7 @@
 #include "MQTT.h" // Include the MQTT header
 #include "weather.h" // For the advanced connectWiFi() function
 #include <random>
+#include "DS18B20.h"
 
 
 

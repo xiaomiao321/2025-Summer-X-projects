@@ -72,13 +72,11 @@ void printLocalTime() {
 bool ensureWiFiConnected() {
     // 1. If already connected, update status and return true.
     if (WiFi.status() == WL_CONNECTED) {
-        if (currentWiFiState != WIFI_STATE_CONNECTED) {
-            Serial.println("WiFi connected.");
-            // Modified: Include time in status string
-            sprintf(wifiStatusStr, "WiFi: Connected at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-            wifi_connected = true;
-            currentWiFiState = WIFI_STATE_CONNECTED;
-        }
+        Serial.println("WiFi connected.");
+        // Modified: Include time in status string
+        sprintf(wifiStatusStr, "WiFi: Connected at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        wifi_connected = true;
+        currentWiFiState = WIFI_STATE_CONNECTED;
         return true;
     }
 
@@ -384,8 +382,9 @@ void syncTime() {
         tft.setTextDatum(MC_DATUM);
         tft.setTextSize(2);
         tft.drawString("WiFi Not Connected", 120, 80);
-        tft.setTextSize(1);
+        tft.setTextSize(2);
         tft.drawString("Cannot sync time.", 120, 110);
+        tft.setTextSize(2);
         delay(2000);
         return;
     }
@@ -702,9 +701,9 @@ void weatherMenu() {
     if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to fetch
 
     // Disconnect WiFi after initial sync and fetch
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-    Serial.println("WiFi disconnected after initial setup.");
+    // WiFi.disconnect(true);
+    // WiFi.mode(WIFI_OFF);
+    // Serial.println("WiFi disconnected after initial setup.");
   }
   
   // After all operations, or if connection FAILED, proceed to the watchface

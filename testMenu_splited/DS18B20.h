@@ -1,8 +1,11 @@
-#ifndef DS18B20_H
-#define DS18B20_H
-#include <OneWire.h>              // OneWire库，用于单总线通信
-#include <DallasTemperature.h>    // DallasTemperature库，用于DS18B20
-#include "Menu.h"
+#ifndef __DS18B20_H
+#define __DS18B20_H
 
+extern float currentTemperature;
+
+void DS18B20_Init();
+void createDS18B20Task();
+float getDS18B20Temp();
 void DS18B20Menu();
+
 #endif

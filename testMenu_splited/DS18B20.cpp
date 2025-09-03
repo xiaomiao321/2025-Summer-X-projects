@@ -2,6 +2,10 @@
 #include <TFT_eSPI.h>
 #include <TFT_eWidget.h>
 #include "MQTT.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include "Menu.h"
+#include "RotaryEncoder.h"
 
 // Graph dimensions and position
 #define TEMP_GRAPH_WIDTH  200
@@ -23,22 +27,44 @@
 OneWire oneWire(DS18B20_PIN);
 DallasTemperature sensors(&oneWire);
 
+float currentTemperature = -127.0;
 bool stopDS18B20Task = false;
 
 GraphWidget gr = GraphWidget(&tft);
 TraceWidget tr = TraceWidget(&gr);
 
-void DS18B20_Init_Task(void *pvParameters) {
+void DS18B20_Init() {
   sensors.begin();
+}
 
-  DeviceAddress tempAddress;
-  delay(1000);
-  vTaskDelete(NULL);
+void updateTempTask(void *pvParameters) {
+    while(1) {
+        sensors.requestTemperatures();
+        float temp = sensors.getTempCByIndex(0);
+        if (temp != DEVICE_DISCONNECTED_C) {
+            currentTemperature = temp;
+        }
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Update every 2 seconds
+    }
+}
+
+void createDS18B20Task() {
+    xTaskCreate(
+        updateTempTask,
+        "DS18B20 Update Task",
+        1024,
+        NULL,
+        1,
+        NULL
+    );
+}
+
+float getDS18B20Temp() {
+    return currentTemperature;
 }
 
 void DS18B20_Task(void *pvParameters) {
   float lastTemp = -274;
-  unsigned long timeout;
   float gx = 0.0;
 
   gr.createGraph(TEMP_GRAPH_WIDTH, TEMP_GRAPH_HEIGHT, tft.color565(5, 5, 5));
@@ -70,17 +96,7 @@ void DS18B20_Task(void *pvParameters) {
       break;
     }
 
-    sensors.requestTemperatures();
-
-    timeout = millis() + 750;
-    while (millis() < timeout) {
-      if (stopDS18B20Task) {
-        goto exit_task;
-      }
-      vTaskDelay(pdMS_TO_TICKS(10));
-    }
-
-    float tempC = sensors.getTempCByIndex(0);
+    float tempC = getDS18B20Temp();
 
     if (tempC != DEVICE_DISCONNECTED_C && tempC > -50 && tempC < 150) {
       tft.fillRect(0, 0, tft.width(), TEMP_GRAPH_Y - 5, TFT_BLACK); // Clear area above graph
@@ -116,7 +132,6 @@ void DS18B20_Task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(500));
   }
 
-exit_task:
   vTaskDelete(NULL);
 }
 
@@ -125,7 +140,6 @@ void DS18B20Menu() {
 
   tft.fillScreen(TFT_BLACK);
 
-  xTaskCreatePinnedToCore(DS18B20_Init_Task, "DS18B20_Init", 4096, NULL, 2, NULL, 0);
   xTaskCreatePinnedToCore(DS18B20_Task, "DS18B20_Task", 4096, NULL, 1, NULL, 0);
 
   while (1) {
@@ -146,8 +160,4 @@ void DS18B20Menu() {
     }
     vTaskDelay(pdMS_TO_TICKS(10));
   }
-
-  // display = 48;
-  // picture_flag = 0;
-  // showMenuConfig();
 }
