@@ -117,7 +117,16 @@ void showMenuConfig() {
 
 // Main menu navigation
 void showMenu() {
-    Alarm_StopMusic(); // Stop alarm music on any interaction
+    // If an alarm is ringing, take over the screen
+    if (g_alarm_is_ringing) {
+        Alarm_ShowRingingScreen();
+        showMenuConfig(); // Redraw the main menu after the alarm is stopped
+        return; // Skip the rest of the menu logic for this iteration
+    }
+
+    // Stop any previously playing sounds when returning to the main menu
+    Alarm_StopMusic(); 
+
     if (current_state != MAIN_MENU) return;
     
     int direction = readEncoder();

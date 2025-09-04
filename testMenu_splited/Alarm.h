@@ -1,16 +1,19 @@
 #ifndef ALARM_H
 #define ALARM_H
 
-// 初始化闹钟模块，在 setup() 中调用
-void Alarm_Setup();
+// Flag to indicate that an alarm is currently ringing
+extern volatile bool g_alarm_is_ringing;
 
-// 在主 loop() 中持续调用，用于在后台检查闹钟时间是否到达
-void Alarm_Loop_Check();
+// Initializes the alarm module and starts the background checking task
+void Alarm_Init();
 
-// 闹钟设置界面的主函数
+// The main UI for the alarm settings
 void AlarmMenu();
 
-// 停止当前正在播放的闹钟音乐
+// The UI to show when an alarm is ringing
+void Alarm_ShowRingingScreen();
+
+// Stops the currently playing alarm music
 void Alarm_StopMusic();
 
 #endif // ALARM_H

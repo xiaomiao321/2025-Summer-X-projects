@@ -19,7 +19,7 @@ void setup() {
 }
 
 void loop() {
-    Alarm_Loop_Check(); // Check for alarm triggers in the background
+    // Alarm_Loop_Check(); // Now runs in a background task
     // loopMQTT(); // Keep the MQTT client running
 
     // // Check if a menu navigation was requested via MQTT

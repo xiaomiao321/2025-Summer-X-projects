@@ -248,7 +248,7 @@ void bootSystem() {
 
     // 运行开机动画
     bootAnimation();
-    Alarm_Setup(); // Initialize Alarm module
+    Alarm_Init(); // Initialize Alarm module and start background task
 
     // Connect to WiFi using the new manager
     // If it fails, it will start a config portal and loop forever until configured.

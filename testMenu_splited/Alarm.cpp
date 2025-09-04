@@ -2,14 +2,19 @@
 #include "Menu.h"
 #include "RotaryEncoder.h"
 #include "Buzzer.h"
-#include "weather.h" // 需要用这里的时间功能
+#include "weather.h" // For time functions
+#include "MQTT.h"    // For exitSubMenu
 #include <EEPROM.h>
 #include <freertos/task.h> // For task management
+#include <pgmspace.h>
 
-#define MAX_ALARMS 10  // 增加最大闹钟数量
+#define MAX_ALARMS 10
 #define EEPROM_START_ADDR 0
-#define EEPROM_MAGIC_KEY 0xAD // Changed magic key
-#define ALARMS_PER_PAGE 5     // 每页显示的闹钟数量
+#define EEPROM_MAGIC_KEY 0xAD
+#define ALARMS_PER_PAGE 5
+
+// --- Global state for alarm ringing ---
+volatile bool g_alarm_is_ringing = false;
 
 // --- Bitmasks for Days of the Week ---
 const uint8_t DAY_SUN = 1; const uint8_t DAY_MON = 2; const uint8_t DAY_TUE = 4;
@@ -34,11 +39,11 @@ static int last_checked_day = -1;
 
 // --- Task Handles ---
 static TaskHandle_t alarmMusicTaskHandle = NULL;
-static int alarmSongIndex = 0; // Play song 0 by default for alarms
+static volatile bool stopAlarmMusic = false;
 
 // --- UI State Variables ---
 static int list_selected_index = 0;
-static int list_scroll_offset = 0; // 添加滚动偏移量
+static int list_scroll_offset = 0;
 static unsigned long last_click_time = 0;
 static const unsigned long DOUBLE_CLICK_WINDOW = 350; // ms
 
@@ -49,26 +54,25 @@ static void saveAlarms();
 static void Alarm_Delete(int index);
 static void editAlarm(int index);
 static void drawAlarmList();
+void Alarm_Loop_Check();
+
 
 // =====================================================================================
 //                                     DRAWING LOGIC
 // =====================================================================================
 
-// Draws the main list of alarms with checkmark/cross icons
 static void drawAlarmList() {
     menuSprite.fillScreen(TFT_BLACK);
-    menuSprite.setTextFont(1); // 明确设置字体为1
-    menuSprite.setTextSize(2); // 确保文本大小重置
+    menuSprite.setTextFont(1);
+    menuSprite.setTextSize(2);
     menuSprite.setTextDatum(TL_DATUM);
     menuSprite.setTextColor(TFT_WHITE);
 
-    // 绘制标题和时间
     extern struct tm timeinfo;
     char titleBuf[30];
-    sprintf(titleBuf, "Alarms %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min,timeinfo.tm_sec);
+    sprintf(titleBuf, "Alarms %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
     menuSprite.drawString(titleBuf, 10, 10);
     
-    // 绘制滚动指示器（如果有更多闹钟）
     if (alarm_count > ALARMS_PER_PAGE) {
         char scrollIndicator[10];
         int currentPage = list_scroll_offset / ALARMS_PER_PAGE + 1;
@@ -79,34 +83,28 @@ static void drawAlarmList() {
     
     menuSprite.drawFastHLine(0, 32, 240, TFT_DARKGREY);
 
-    // 计算可见范围内的闹钟
     int start_index = list_scroll_offset;
-    int end_index = min(list_scroll_offset + ALARMS_PER_PAGE, alarm_count + 1); // +1 for "Add New" option
+    int end_index = min(list_scroll_offset + ALARMS_PER_PAGE, alarm_count + 1);
     
     for (int i = start_index; i < end_index; i++) {
         int display_index = i - list_scroll_offset;
         int y_pos = 45 + (display_index * 38);
         
-        // 高亮当前选中的项目
         if (i == list_selected_index) {
             menuSprite.drawRoundRect(5, y_pos - 5, 230, 36, 5, TFT_YELLOW);
         }
 
         if (i < alarm_count) {
-            // --- Draw Checkbox/Crossbox ---
             int box_x = 15, box_y = y_pos - 2;
             menuSprite.drawRect(box_x, box_y, 20, 20, TFT_WHITE);
             if (alarms[i].enabled) {
-                // Green Checkmark
                 menuSprite.drawLine(box_x + 4, box_y + 10, box_x + 8, box_y + 14, TFT_GREEN);
                 menuSprite.drawLine(box_x + 8, box_y + 14, box_x + 16, box_y + 6, TFT_GREEN);
             } else {
-                // Red Cross
                 menuSprite.drawLine(box_x + 4, box_y + 4, box_x + 16, box_y + 16, TFT_RED);
                 menuSprite.drawLine(box_x + 16, box_y + 4, box_x + 4, box_y + 16, TFT_RED);
             }
 
-            // --- Draw Time and Days ---
             char buf[20];
             snprintf(buf, sizeof(buf), "%02d:%02d", alarms[i].hour, alarms[i].minute);
             menuSprite.drawString(buf, 50, y_pos);
@@ -124,7 +122,6 @@ static void drawAlarmList() {
     menuSprite.pushSprite(0, 0);
 }
 
-// Draws the screen for editing a single alarm
 static void drawEditScreen(const AlarmSetting& alarm, EditMode mode, int day_cursor) {
     menuSprite.fillScreen(TFT_BLACK);
     menuSprite.setTextDatum(MC_DATUM);
@@ -200,47 +197,90 @@ static void Alarm_Delete(int index) {
     saveAlarms();
 }
 
+void Alarm_MusicLoop_Task(void *pvParameters) {
+    while (true) {
+        for (int i = 0; i < numSongs; i++) {
+            if (stopAlarmMusic) {
+                vTaskDelete(NULL);
+            }
+
+            Song currentSong;
+            memcpy_P(&currentSong, &songs[i], sizeof(Song));
+
+            for (int j = 0; j < currentSong.length; j++) {
+                if (stopAlarmMusic) {
+                    noTone(BUZZER_PIN);
+                    vTaskDelete(NULL);
+                }
+                int note = pgm_read_word(&currentSong.melody[j]);
+                int duration = pgm_read_word(&currentSong.durations[j]);
+                
+                tone(BUZZER_PIN, note, duration * 0.9);
+                vTaskDelay(pdMS_TO_TICKS(duration));
+            }
+            vTaskDelay(pdMS_TO_TICKS(500)); // Pause between songs
+        }
+    }
+}
+
 static void triggerAlarm(int index) {
   alarms[index].triggered_today = true;
   saveAlarms();
   Serial.printf("ALARM %d TRIGGERED! PLAYING MUSIC...\n", index);
 
-  // Stop any previously playing alarm music
   if (alarmMusicTaskHandle != NULL) {
       vTaskDelete(alarmMusicTaskHandle);
+      alarmMusicTaskHandle = NULL;
   }
 
-  // Start the music task
-  extern bool stopBuzzerTask;
-  stopBuzzerTask = false;
-  xTaskCreatePinnedToCore(Buzzer_PlayMusic_Task, "AlarmMusicTask", 8192, &alarmSongIndex, 1, &alarmMusicTaskHandle, 0);
+  exitSubMenu = true;
+  g_alarm_is_ringing = true;
+  stopAlarmMusic = false;
+  
+  xTaskCreatePinnedToCore(Alarm_MusicLoop_Task, "AlarmMusicLoopTask", 8192, NULL, 1, &alarmMusicTaskHandle, 0);
 }
 
 void Alarm_StopMusic() {
     if (alarmMusicTaskHandle != NULL) {
-        vTaskDelete(alarmMusicTaskHandle);
+        stopAlarmMusic = true;
+        vTaskDelay(pdMS_TO_TICKS(50)); // Give task time to stop
+        // No need to delete, task will delete itself.
         alarmMusicTaskHandle = NULL;
-        noTone(BUZZER_PIN); // Ensure sound stops immediately
-        Serial.println("Alarm music stopped by user.");
     }
+    noTone(BUZZER_PIN); // Ensure sound stops immediately
+    g_alarm_is_ringing = false;
+    Serial.println("Alarm music stopped by user.");
 }
 
-void Alarm_Setup() {
+void Alarm_Init() {
   EEPROM.begin(sizeof(alarms) + 1);
   loadAlarms();
   last_checked_day = -1;
+  
+  void Alarm_Check_Task(void *pvParameters); // Forward declare
+  xTaskCreate(Alarm_Check_Task, "Alarm Check Task", 2048, NULL, 5, NULL);
+}
+
+void Alarm_Check_Task(void *pvParameters) {
+    for(;;) {
+        Alarm_Loop_Check();
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Check every second
+    }
 }
 
 void Alarm_Loop_Check() {
   extern struct tm timeinfo;
   if (timeinfo.tm_year < 100) return;
+  
   int current_day = timeinfo.tm_wday;
   if (last_checked_day != current_day) {
     for (int i = 0; i < alarm_count; ++i) { alarms[i].triggered_today = false; }
     last_checked_day = current_day;
     saveAlarms();
   }
+  
   for (int i = 0; i < alarm_count; ++i) {
+    if (g_alarm_is_ringing) break; // Don't trigger a new alarm if one is already ringing
     if (alarms[i].enabled && !alarms[i].triggered_today) {
       bool day_match = alarms[i].days_of_week & (1 << current_day);
       if (day_match && alarms[i].hour == timeinfo.tm_hour && alarms[i].minute == timeinfo.tm_min) {
@@ -253,6 +293,51 @@ void Alarm_Loop_Check() {
 // =====================================================================================
 //                                     UI LOGIC
 // =====================================================================================
+
+void Alarm_ShowRingingScreen() {
+    menuSprite.fillScreen(TFT_BLACK);
+    menuSprite.setTextDatum(MC_DATUM);
+
+    // Draw static text first
+    menuSprite.setTextColor(TFT_YELLOW);
+    menuSprite.setTextFont(4);
+    menuSprite.drawString("Time's Up!", 120, 120); // Moved down to make space for clock
+
+    menuSprite.setTextFont(2);
+    menuSprite.setTextColor(TFT_WHITE);
+    menuSprite.drawString("Press to Stop", 120, 180); // Moved down
+
+    unsigned long last_time_update = 0;
+    bool initial_draw = true;
+
+    while (g_alarm_is_ringing) {
+        if (readButton()) {
+            tone(BUZZER_PIN, 1500, 100);
+            Alarm_StopMusic(); // This will set g_alarm_is_ringing to false
+        }
+
+        if (millis() - last_time_update >= 1000 || initial_draw) {
+            last_time_update = millis();
+            initial_draw = false;
+
+            // Get time
+            extern struct tm timeinfo;
+            if (getLocalTime(&timeinfo, 0)) { // Non-blocking get time
+                 // Format time
+                char time_buf[9];
+                sprintf(time_buf, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+
+                // Draw time
+                menuSprite.setTextFont(4); // Or another suitable font
+                menuSprite.setTextColor(TFT_WHITE, TFT_BLACK); // Draw with black background to erase old time
+                menuSprite.drawString(time_buf, 120, 60); // Positioned above "Time's Up!"
+            }
+             menuSprite.pushSprite(0, 0); // Push the entire sprite to the screen
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
 
 static void editAlarm(int index) {
     AlarmSetting temp_alarm;
@@ -267,9 +352,11 @@ static void editAlarm(int index) {
     drawEditScreen(temp_alarm, edit_mode, day_cursor);
 
     while(true) {
+        if (g_alarm_is_ringing) { return; } // Exit if alarm starts
+
         if (readButtonLongPress()) { 
             menuSprite.setTextFont(1); 
-            menuSprite.setTextSize(2); // 添加文本大小重置
+            menuSprite.setTextSize(2);
             return; 
         }
 
@@ -282,7 +369,6 @@ static void editAlarm(int index) {
                 case EDIT_DAYS: day_cursor = (day_cursor + encoder_value + 7) % 7; break;
                 case EDIT_SAVE:
                 case EDIT_DELETE:
-                    // When on buttons, encoder switches between them
                     if (encoder_value > 0) edit_mode = EDIT_DELETE;
                     if (encoder_value < 0) edit_mode = EDIT_SAVE;
                     break;
@@ -321,18 +407,19 @@ static void editAlarm(int index) {
 
 void AlarmMenu() {
     list_selected_index = 0;
-    list_scroll_offset = 0; // 重置滚动偏移
+    list_scroll_offset = 0;
     int click_count = 0;
-    unsigned long last_update_time = 0; // 记录上次更新时间
-    const unsigned long UPDATE_INTERVAL = 1000; // 每秒更新
+    unsigned long last_update_time = 0;
+    const unsigned long UPDATE_INTERVAL = 1000;
     menuSprite.setTextFont(1);
     menuSprite.setTextSize(2);
     drawAlarmList();
 
     while (true) {
+        if (g_alarm_is_ringing) { return; } // Exit if alarm starts
+
         unsigned long current_time = millis();
         if (current_time - last_update_time >= UPDATE_INTERVAL) {
-            // 更新 timeinfo
             extern struct tm timeinfo;
             if (!getLocalTime(&timeinfo)) {
                 Serial.println("Failed to obtain time");
@@ -344,7 +431,7 @@ void AlarmMenu() {
         if (readButtonLongPress()) { 
             menuSprite.setTextFont(1); 
             menuSprite.setTextSize(2);
-            click_count = 0; // Reset click count on long press exit
+            click_count = 0;
             return; 
         }
 
@@ -353,7 +440,6 @@ void AlarmMenu() {
             int max_items = (alarm_count < MAX_ALARMS) ? alarm_count + 1 : MAX_ALARMS;
             list_selected_index = (list_selected_index + encoder_value + max_items) % max_items;
             
-            // 自动滚动逻辑
             if (list_selected_index < list_scroll_offset) {
                 list_scroll_offset = list_selected_index;
             } else if (list_selected_index >= list_scroll_offset + ALARMS_PER_PAGE) {

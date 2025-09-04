@@ -389,7 +389,7 @@ void Buzzer_Task(void *pvParameters) {
         firstDraw = true;
         goto exit_loop;
       }
-      tone(BUZZER_PIN, note, duration);
+      tone(BUZZER_PIN, note, duration*0.9);
       // Send command to Led_Task
       currentLedCommand.effectType = (i % 2 == 0) ? 1 : 2; // Alternate colorWipe and rainbow
       currentLedCommand.color = mapFrequencyToColor(note);
@@ -424,7 +424,7 @@ void Buzzer_Task(void *pvParameters) {
       Serial.println();
       
       displayPlayingSong(songIndex, i, song.length, note, colorSchemes[song.colorSchemeIndex]);
-      vTaskDelay(pdMS_TO_TICKS(duration * 1.1));
+      vTaskDelay(pdMS_TO_TICKS(duration));
       noTone(BUZZER_PIN);
       // Led_Task will handle clearing the strip after the effect
     }
@@ -460,14 +460,14 @@ void Buzzer_PlayMusic_Task(void *pvParameters) {
     int note = pgm_read_word(song.melody + i);
     int duration = pgm_read_word(song.durations + i);
     
-    tone(BUZZER_PIN, note, duration);
+    tone(BUZZER_PIN, note, duration*0.9);
 
     // Keep LED effects
     currentLedCommand.effectType = (i % 2 == 0) ? 1 : 2;
     currentLedCommand.color = mapFrequencyToColor(note);
     currentLedCommand.frequency = note;
 
-    vTaskDelay(pdMS_TO_TICKS(duration * 1.1));
+    vTaskDelay(pdMS_TO_TICKS(duration));
     
     noTone(BUZZER_PIN); // Ensure tone is off before next note
   }
