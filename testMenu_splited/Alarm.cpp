@@ -1,0 +1,352 @@
+#include "Alarm.h"
+#include "Menu.h"
+#include "RotaryEncoder.h"
+#include "Buzzer.h"
+#include "weather.h" // 需要用这里的时间功能
+#include <EEPROM.h>
+#include <freertos/task.h> // For task management
+
+#define MAX_ALARMS 5
+#define EEPROM_START_ADDR 0
+/*
+ * Alarm Clock Feature for ESP32 Weather Clock
+ * 
+ * Style Guide:
+ * - C-style, no classes.
+ * - Module state managed by file-scoped static variables.
+ * - UI implemented in blocking loops within dedicated functions (e.g., AlarmMenu, editAlarm).
+ */
+
+#include "Alarm.h"
+#include "Menu.h"
+#include "RotaryEncoder.h"
+#include "Buzzer.h"
+#include "weather.h"
+#include <EEPROM.h>
+
+#define MAX_ALARMS 5
+#define EEPROM_START_ADDR 0
+#define EEPROM_MAGIC_KEY 0xAD // Changed magic key
+
+// --- Bitmasks for Days of the Week ---
+const uint8_t DAY_SUN = 1; const uint8_t DAY_MON = 2; const uint8_t DAY_TUE = 4;
+const uint8_t DAY_WED = 8; const uint8_t DAY_THU = 16; const uint8_t DAY_FRI = 32;
+const uint8_t DAY_SAT = 64; const uint8_t DAYS_ALL = 0x7F;
+
+// --- Data Structures ---
+struct AlarmSetting {
+  uint8_t hour;
+  uint8_t minute;
+  uint8_t days_of_week;
+  bool enabled;
+  bool triggered_today;
+};
+
+enum EditMode { EDIT_HOUR, EDIT_MINUTE, EDIT_DAYS, EDIT_SAVE, EDIT_DELETE };
+
+// --- Module-internal State Variables ---
+static AlarmSetting alarms[MAX_ALARMS];
+static int alarm_count = 0;
+static int last_checked_day = -1;
+
+// --- Task Handles ---
+static TaskHandle_t alarmMusicTaskHandle = NULL;
+static int alarmSongIndex = 0; // Play song 0 by default for alarms
+
+// --- UI State Variables ---
+static int list_selected_index = 0;
+static unsigned long last_click_time = 0;
+static const unsigned long DOUBLE_CLICK_WINDOW = 350; // ms
+
+// =====================================================================================
+//                                 FORWARD DECLARATIONS
+// =====================================================================================
+static void saveAlarms();
+static void Alarm_Delete(int index);
+static void editAlarm(int index);
+static void drawAlarmList();
+
+// =====================================================================================
+//                                     DRAWING LOGIC
+// =====================================================================================
+
+// Draws the main list of alarms with checkmark/cross icons
+static void drawAlarmList() {
+    menuSprite.fillScreen(TFT_BLACK);
+    menuSprite.setTextDatum(TL_DATUM);
+    menuSprite.setTextFont(2);
+    menuSprite.setTextColor(TFT_WHITE);
+
+    menuSprite.drawString("Alarms", 10, 10);
+    menuSprite.drawFastHLine(0, 32, 240, TFT_DARKGREY);
+
+    for (int i = 0; i < MAX_ALARMS; i++) {
+        int y_pos = 45 + (i * 38);
+        if (i == list_selected_index) {
+            menuSprite.drawRoundRect(5, y_pos - 5, 230, 36, 5, TFT_YELLOW);
+        }
+
+        if (i < alarm_count) {
+            // --- Draw Checkbox/Crossbox ---
+            int box_x = 15, box_y = y_pos - 2;
+            menuSprite.drawRect(box_x, box_y, 20, 20, TFT_WHITE);
+            if (alarms[i].enabled) {
+                // Green Checkmark
+                menuSprite.drawLine(box_x + 4, box_y + 10, box_x + 8, box_y + 14, TFT_GREEN);
+                menuSprite.drawLine(box_x + 8, box_y + 14, box_x + 16, box_y + 6, TFT_GREEN);
+            } else {
+                // Red Cross
+                menuSprite.drawLine(box_x + 4, box_y + 4, box_x + 16, box_y + 16, TFT_RED);
+                menuSprite.drawLine(box_x + 16, box_y + 4, box_x + 4, box_y + 16, TFT_RED);
+            }
+
+            // --- Draw Time and Days ---
+            char buf[20];
+            snprintf(buf, sizeof(buf), "%02d:%02d", alarms[i].hour, alarms[i].minute);
+            menuSprite.drawString(buf, 50, y_pos);
+
+            const char* days[] = {"S", "M", "T", "W", "T", "F", "S"};
+            for(int d=0; d<7; d++){
+                menuSprite.setTextColor((alarms[i].days_of_week & (1 << d)) ? TFT_GREEN : TFT_DARKGREY);
+                menuSprite.drawString(days[d], 140 + (d * 12), y_pos);
+            }
+            menuSprite.setTextColor(TFT_WHITE);
+        } else if (i == alarm_count && i < MAX_ALARMS) {
+            menuSprite.drawString("+ Add New Alarm", 15, y_pos);
+        }
+    }
+    menuSprite.pushSprite(0, 0);
+}
+
+// Draws the screen for editing a single alarm
+static void drawEditScreen(const AlarmSetting& alarm, EditMode mode, int day_cursor) {
+    menuSprite.fillScreen(TFT_BLACK);
+    menuSprite.setTextDatum(MC_DATUM);
+
+    menuSprite.setTextFont(7); menuSprite.setTextSize(1);
+    char time_buf[6];
+    sprintf(time_buf, "%02d:%02d", alarm.hour, alarm.minute);
+    menuSprite.drawString(time_buf, 120, 80);
+
+    if (mode == EDIT_HOUR) menuSprite.fillRect(38, 115, 70, 4, TFT_YELLOW);
+    else if (mode == EDIT_MINUTE) menuSprite.fillRect(132, 115, 70, 4, TFT_YELLOW);
+
+    menuSprite.setTextFont(2);
+    const char* days[] = {"S", "M", "T", "W", "T", "F", "S"};
+    for(int d=0; d<7; d++){
+        int day_x = 24 + (d * 30); int day_y = 160;
+        if (mode == EDIT_DAYS && d == day_cursor) menuSprite.drawRect(day_x - 10, day_y - 12, 20, 24, TFT_YELLOW);
+        menuSprite.setTextColor((alarm.days_of_week & (1 << d)) ? TFT_GREEN : TFT_DARKGREY);
+        menuSprite.drawString(days[d], day_x, day_y);
+    }
+
+    int save_box_y = 205;
+    menuSprite.setTextFont(2); menuSprite.setTextColor(TFT_WHITE);
+    if (mode == EDIT_SAVE) {
+        menuSprite.fillRoundRect(40, save_box_y, 75, 30, 5, TFT_GREEN);
+        menuSprite.setTextColor(TFT_BLACK);
+    }
+    menuSprite.drawRoundRect(40, save_box_y, 75, 30, 5, TFT_WHITE);
+    menuSprite.drawString("SAVE", 78, save_box_y + 15);
+
+    menuSprite.setTextColor(TFT_WHITE);
+    if (mode == EDIT_DELETE) {
+        menuSprite.fillRoundRect(125, save_box_y, 75, 30, 5, TFT_RED);
+        menuSprite.setTextColor(TFT_BLACK);
+    }
+    menuSprite.drawRoundRect(125, save_box_y, 75, 30, 5, TFT_WHITE);
+    menuSprite.drawString("DELETE", 163, save_box_y + 15);
+
+    menuSprite.pushSprite(0, 0);
+}
+
+// =====================================================================================
+//                                 BACKGROUND LOGIC
+// =====================================================================================
+
+static void saveAlarms() {
+  EEPROM.write(EEPROM_START_ADDR, EEPROM_MAGIC_KEY);
+  EEPROM.put(EEPROM_START_ADDR + 1, alarms);
+  EEPROM.commit();
+}
+
+static void loadAlarms() {
+  if (EEPROM.read(EEPROM_START_ADDR) == EEPROM_MAGIC_KEY) {
+    EEPROM.get(EEPROM_START_ADDR + 1, alarms);
+    alarm_count = 0;
+    for (int i = 0; i < MAX_ALARMS; ++i) if (alarms[i].hour != 255) alarm_count++;
+  } else {
+    memset(alarms, 0xFF, sizeof(alarms));
+    for(int i=0; i<MAX_ALARMS; ++i) alarms[i].enabled = false;
+    alarm_count = 0;
+    saveAlarms();
+  }
+}
+
+static void Alarm_Delete(int index) {
+    if (index < 0 || index >= alarm_count) return;
+    for (int i = index; i < alarm_count - 1; i++) {
+        alarms[i] = alarms[i + 1];
+    }
+    alarm_count--;
+    memset(&alarms[alarm_count], 0xFF, sizeof(AlarmSetting));
+    alarms[alarm_count].enabled = false;
+    saveAlarms();
+}
+
+static void triggerAlarm(int index) {
+  alarms[index].triggered_today = true;
+  saveAlarms();
+  Serial.printf("ALARM %d TRIGGERED! PLAYING MUSIC...\n", index);
+
+  // Stop any previously playing alarm music
+  if (alarmMusicTaskHandle != NULL) {
+      vTaskDelete(alarmMusicTaskHandle);
+  }
+
+  // Start the music task
+  extern bool stopBuzzerTask;
+  stopBuzzerTask = false;
+  xTaskCreatePinnedToCore(Buzzer_PlayMusic_Task, "AlarmMusicTask", 8192, &alarmSongIndex, 1, &alarmMusicTaskHandle, 0);
+}
+
+void Alarm_StopMusic() {
+    if (alarmMusicTaskHandle != NULL) {
+        vTaskDelete(alarmMusicTaskHandle);
+        alarmMusicTaskHandle = NULL;
+        noTone(BUZZER_PIN); // Ensure sound stops immediately
+        Serial.println("Alarm music stopped by user.");
+    }
+}
+
+void Alarm_Setup() {
+  EEPROM.begin(sizeof(alarms) + 1);
+  loadAlarms();
+  last_checked_day = -1;
+}
+
+void Alarm_Loop_Check() {
+  extern struct tm timeinfo;
+  if (timeinfo.tm_year < 100) return;
+  int current_day = timeinfo.tm_wday;
+  if (last_checked_day != current_day) {
+    for (int i = 0; i < alarm_count; ++i) { alarms[i].triggered_today = false; }
+    last_checked_day = current_day;
+    saveAlarms();
+  }
+  for (int i = 0; i < alarm_count; ++i) {
+    if (alarms[i].enabled && !alarms[i].triggered_today) {
+      bool day_match = alarms[i].days_of_week & (1 << current_day);
+      if (day_match && alarms[i].hour == timeinfo.tm_hour && alarms[i].minute == timeinfo.tm_min) {
+        triggerAlarm(i);
+      }
+    }
+  }
+}
+
+// =====================================================================================
+//                                     UI LOGIC
+// =====================================================================================
+
+static void editAlarm(int index) {
+    AlarmSetting temp_alarm;
+    bool is_new_alarm = (index >= alarm_count);
+
+    if (is_new_alarm) temp_alarm = {12, 0, 0, true, false};
+    else temp_alarm = alarms[index];
+
+    EditMode edit_mode = EDIT_HOUR;
+    int day_cursor = 0;
+
+    drawEditScreen(temp_alarm, edit_mode, day_cursor);
+
+    while(true) {
+        if (readButtonLongPress()) { menuSprite.setTextFont(1); return; }
+
+        int encoder_value = readEncoder();
+        if (encoder_value != 0) {
+            tone(BUZZER_PIN, 1000, 20);
+            switch(edit_mode) {
+                case EDIT_HOUR: temp_alarm.hour = (temp_alarm.hour + encoder_value + 24) % 24; break;
+                case EDIT_MINUTE: temp_alarm.minute = (temp_alarm.minute + encoder_value + 60) % 60; break;
+                case EDIT_DAYS: day_cursor = (day_cursor + encoder_value + 7) % 7; break;
+                case EDIT_SAVE:
+                case EDIT_DELETE:
+                    // When on buttons, encoder switches between them
+                    if (encoder_value > 0) edit_mode = EDIT_DELETE;
+                    if (encoder_value < 0) edit_mode = EDIT_SAVE;
+                    break;
+                default: break;
+            }
+            drawEditScreen(temp_alarm, edit_mode, day_cursor);
+        }
+
+        if (readButton()) {
+            tone(BUZZER_PIN, 2000, 50);
+            if (edit_mode == EDIT_DAYS) {
+                temp_alarm.days_of_week ^= (1 << day_cursor);
+            } else if (edit_mode == EDIT_SAVE) {
+                if (is_new_alarm) {
+                    alarms[alarm_count] = temp_alarm;
+                    alarm_count++;
+                } else {
+                    alarms[index] = temp_alarm;
+                }
+                saveAlarms();
+                menuSprite.setTextFont(1); return;
+            } else if (edit_mode == EDIT_DELETE) {
+                if (!is_new_alarm) Alarm_Delete(index);
+                menuSprite.setTextFont(1); return;
+            }
+            edit_mode = (EditMode)((edit_mode + 1) % 5);
+            drawEditScreen(temp_alarm, edit_mode, day_cursor);
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
+void AlarmMenu() {
+    list_selected_index = 0;
+    int click_count = 0;
+    drawAlarmList();
+
+    while (true) {
+        if (readButtonLongPress()) { 
+            menuSprite.setTextFont(1); 
+            click_count = 0; // Reset click count on long press exit
+            return; 
+        }
+
+        int encoder_value = readEncoder();
+        if (encoder_value != 0) {
+            int max_items = (alarm_count < MAX_ALARMS) ? alarm_count + 1 : MAX_ALARMS;
+            list_selected_index = (list_selected_index + encoder_value + max_items) % max_items;
+            drawAlarmList();
+            tone(BUZZER_PIN, 1000 + 50 * list_selected_index, 20);
+        }
+
+        if (readButton()) { click_count++; last_click_time = millis(); }
+
+        if (click_count > 0 && millis() - last_click_time > DOUBLE_CLICK_WINDOW) {
+            if (click_count == 1) { // SINGLE CLICK
+                tone(BUZZER_PIN, 2000, 50);
+                if (list_selected_index < alarm_count) {
+                    alarms[list_selected_index].enabled = !alarms[list_selected_index].enabled;
+                    saveAlarms();
+                } else { editAlarm(alarm_count); }
+                drawAlarmList();
+            }
+            click_count = 0;
+        }
+        
+        if (click_count >= 2) { // DOUBLE CLICK
+            tone(BUZZER_PIN, 2500, 50);
+            if (list_selected_index < alarm_count) {
+                editAlarm(list_selected_index);
+                drawAlarmList();
+            }
+            click_count = 0;
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}

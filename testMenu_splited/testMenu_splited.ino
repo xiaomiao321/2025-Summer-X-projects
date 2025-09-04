@@ -7,21 +7,19 @@
 #include "weather.h" // For the advanced connectWiFi() function
 #include <random>
 #include "DS18B20.h"
+#include "WiFiManager.h"
+#include "Alarm.h"
 
 
 
 void setup() {
     bootSystem();
-
-    // Establish WiFi connection with detailed feedback on screen
-    // connectWiFi(); 
-    
     // Initialize MQTT, assuming WiFi is now connected
     // connectMQTT(); 
-    showMenuConfig();
 }
 
 void loop() {
+    Alarm_Loop_Check(); // Check for alarm triggers in the background
     // loopMQTT(); // Keep the MQTT client running
 
     // // Check if a menu navigation was requested via MQTT

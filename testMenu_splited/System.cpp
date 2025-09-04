@@ -5,7 +5,8 @@
 #include <WiFi.h>
 #include <driver/adc.h>
 #include <esp_system.h>
-
+#include "Alarm.h"
+#include "WiFiManager.h"
 #include "Menu.h"
 #include "LED.h"
 #include "Buzzer.h"
@@ -270,9 +271,14 @@ void bootSystem() {
     setupADC();
     menuSprite.createSprite(239, 239);
 
+
     // 运行开机动画
     bootAnimation();
+    Alarm_Setup(); // Initialize Alarm module
 
+    // Connect to WiFi using the new manager
+    // If it fails, it will start a config portal and loop forever until configured.
+    connectWiFi_with_Manager();
     // 清屏进入主菜单
     tft.fillScreen(TFT_BLACK);
     showMenuConfig();

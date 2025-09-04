@@ -160,10 +160,7 @@ void GamesMenu() {
     static bool gamesMenuSingleClickPending = false;
 
     while (true) {
-        if (exitSubMenu) {
-            exitSubMenu = false; // Reset flag
-            return; // Exit GamesMenu
-        }
+        if (readButtonLongPress()) { return; }
         int direction = readEncoder();
         if (direction != 0) {
             if (direction == 1) {
@@ -312,13 +309,7 @@ void ConwayGame() {
         }
 
         // Button handling for exit
-        if (readButton()) { // Use readButton() directly
-            if (gamesDetectDoubleClick()) { // Double click detected
-                return; // Exit
-            } else {
-                // Single click has no effect in auto-run mode
-            }
-        }
+        if (readButtonLongPress()) { return; }
         vTaskDelay(pdMS_TO_TICKS(10)); // Small delay for responsiveness
     }
 }
@@ -362,21 +353,19 @@ void BuzzerTapGame() {
             nextToneInterval = random(1000, 3000); // New random interval
         }
 
-        if (readButton()) { // Use readButton() directly
-            if (gamesDetectDoubleClick()) {
-                noTone(BUZZER_PIN); // Stop any ongoing tone
-                return; // Exit
+        if (readButtonLongPress()) {
+            noTone(BUZZER_PIN); // Stop any ongoing tone
+            return; // Exit
+        } else if (readButton()) { // Handle short clicks for gameplay
+            // Check if tap was within window
+            if (currentTime - lastToneTime > 0 && currentTime - lastToneTime < TAP_WINDOW_MS) {
+                buzzerTapScore++;
+                tft.fillRect(100, 50, 100, 20, TFT_BLACK); // Clear old score
+                tft.setCursor(100, 50);
+                tft.print(buzzerTapScore);
+                tone(BUZZER_PIN, TONE_FREQ * 2, 50); // Success sound
             } else {
-                // Check if tap was within window
-                if (currentTime - lastToneTime > 0 && currentTime - lastToneTime < TAP_WINDOW_MS) {
-                    buzzerTapScore++;
-                    tft.fillRect(100, 50, 100, 20, TFT_BLACK); // Clear old score
-                    tft.setCursor(100, 50);
-                    tft.print(buzzerTapScore);
-                    tone(BUZZER_PIN, TONE_FREQ * 2, 50); // Success sound
-                } else {
-                    tone(BUZZER_PIN, TONE_FREQ / 2, 50); // Fail sound
-                }
+                tone(BUZZER_PIN, TONE_FREQ / 2, 50); // Fail sound
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -462,20 +451,17 @@ void TimeChallengeGame() {
         }
         menuSprite.pushSprite(0, 0); // Push the sprite to the screen
 
-        if (readButton()) { // Use readButton() directly
-            if (gamesDetectDoubleClick()) { // Double click detected
-                return; // Exit game
-            } else { // Single click
-                if (!gameEnded) {
-                    pressTime = currentTime;
-                    gameEnded = true;
-                    tone(BUZZER_PIN, 1500, 100); // Confirmation sound
-                    
-                    float diffSec = (float)((long)(pressTime - startTime) - (long)targetTimeMs) / 1000.0;
-                    menuSprite.setTextSize(2);
-                    menuSprite.setCursor(20, 130);
-                    menuSprite.printf("Diff: %.2f s", diffSec);
-                }
+        if (readButtonLongPress()) { return; } // Exit game
+        else if (readButton()) { // Handle short clicks for gameplay
+            if (!gameEnded) {
+                pressTime = currentTime;
+                gameEnded = true;
+                tone(BUZZER_PIN, 1500, 100); // Confirmation sound
+                
+                float diffSec = (float)((long)(pressTime - startTime) - (long)targetTimeMs) / 1000.0;
+                menuSprite.setTextSize(2);
+                menuSprite.setCursor(20, 130);
+                menuSprite.printf("Diff: %.2f s", diffSec);
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -517,12 +503,7 @@ void flappy_bird_game() {
 
     while (true) {
         // --- Exit Condition ---
-        if (readButton()) {
-            if (gamesDetectDoubleClick()) {
-                return; // Exit game
-            }
-            lastClickTime = millis();
-        }
+        if (readButtonLongPress()) { return; }
 
         // --- Logic ---
         if (!start_game) {

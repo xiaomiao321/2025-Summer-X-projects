@@ -3,6 +3,8 @@
 #include "img.h"
 #include "LED.h"
 #include "Buzzer.h"
+#include "Alarm.h"
+#include "Pomodoro.h"
 #include "weather.h"
 #include "performance.h"
 #include "DS18B20.h"
@@ -36,6 +38,8 @@ uint8_t picture_flag = 0;           // Current selected menu item index
 const MenuItem menuItems[] = {
     {"Clock", Weather, &weatherMenu},
     {"Countdown", Countdown, &CountdownMenu},
+    {"Alarm", Timer, &AlarmMenu}, // Added Alarm Menu
+    {"Pomodoro", Countdown, &PomodoroMenu},
     {"Stopwatch", Timer, &StopwatchMenu},
     {"Music", Music, &BuzzerMenu},
     {"Performance", Performance, &performanceMenu},
@@ -58,9 +62,17 @@ enum MenuState {
 static MenuState current_state = MAIN_MENU;
 static const uint8_t ANIMATION_STEPS = 12;
 
-// Easing function
+// Easing functions
 float easeOutQuad(float t) {
     return 1.0f - (1.0f - t) * (1.0f - t);
+}
+
+// New easing function for the 'overshoot' effect
+float easeOutBack(float t) {
+    const float c1 = 1.70158f;
+    const float c3 = c1 + 1.0f;
+    float t_minus_1 = t - 1.0f;
+    return 1.0f + c3 * t_minus_1 * t_minus_1 * t_minus_1 + c1 * t_minus_1 * t_minus_1;
 }
 
 
@@ -105,6 +117,7 @@ void showMenuConfig() {
 
 // Main menu navigation
 void showMenu() {
+    Alarm_StopMusic(); // Stop alarm music on any interaction
     if (current_state != MAIN_MENU) return;
     
     int direction = readEncoder();
@@ -122,7 +135,7 @@ void showMenu() {
         
         for (uint8_t i = 0; i <= ANIMATION_STEPS; i++) { // Loop from 0 to ANIMATION_STEPS
             float t = (float)i / ANIMATION_STEPS; // Progress from 0.0 to 1.0
-            float eased_t = easeOutQuad(t); // Apply easing
+            float eased_t = easeOutBack(t); // Apply OVERSHOOT easing
 
             display = start_display + (target_display - start_display) * eased_t; // Calculate interpolated position
 

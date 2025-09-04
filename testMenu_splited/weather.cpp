@@ -8,7 +8,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include "img.h"
-#include "Watchface.h"
+#include "WiFiManager.h"
 #include "System.h"
 // WiFi & Time
 const char* ssid     = "xiaomiao_hotspot";
@@ -688,12 +688,13 @@ void silentFetchWeather() {
 }
 
 void weatherMenu() {
-  if (exitSubMenu) { exitSubMenu = false; return; }
-  
-  bool connected = connectWiFi(); // Connect WiFi when entering the menu
-  if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to connect
+    if (exitSubMenu) { exitSubMenu = false; return; }
 
-  if (connected) {
+    bool connected = connectWiFi(); 
+    //bool connected = connectWiFi_with_Manager(); // Connect WiFi when entering the menu
+    if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to connect
+
+    if (connected) {
     syncTime();
     if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to sync
 
@@ -704,9 +705,9 @@ void weatherMenu() {
     // WiFi.disconnect(true);
     // WiFi.mode(WIFI_OFF);
     // Serial.println("WiFi disconnected after initial setup.");
-  }
-  
-  // After all operations, or if connection FAILED, proceed to the watchface
-  // The watchface itself has an exit loop.
-  WatchfaceMenu();
+    }
+
+    // After all operations, or if connection FAILED, proceed to the watchface
+    // The watchface itself has an exit loop.
+    WatchfaceMenu();
 }
