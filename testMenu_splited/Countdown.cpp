@@ -3,7 +3,7 @@
 #include "MQTT.h"
 #include "Buzzer.h"
 #include "RotaryEncoder.h"
-
+#include "Alarm.h"
 // --- State Variables ---
 static unsigned long countdown_target_millis = 0;
 static unsigned long countdown_start_millis = 0;
@@ -120,6 +120,7 @@ void CountdownMenu() {
             exitSubMenu = false;
             return;
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         if (readButtonLongPress()) {
             tone(BUZZER_PIN, 1500, 100);
             return;

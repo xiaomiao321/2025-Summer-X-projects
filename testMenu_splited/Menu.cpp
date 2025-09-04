@@ -12,7 +12,7 @@
 #include "Games.h"
 #include "ADC.h"
 #include "Watchface.h" // <-- ADDED
-
+#include "MQTT.h"
 // --- Layout Configuration ---
 // Change these values to adjust the menu layout
 static const int ICON_SIZE = 200;     // The size for the icons (e.g., 180x180)
@@ -117,6 +117,9 @@ void showMenuConfig() {
 
 // Main menu navigation
 void showMenu() {
+    menuSprite.setTextFont(1);
+    menuSprite.setTextSize(1);
+    
     // If an alarm is ringing, take over the screen
     if (g_alarm_is_ringing) {
         Alarm_ShowRingingScreen();
@@ -125,7 +128,7 @@ void showMenu() {
     }
 
     // Stop any previously playing sounds when returning to the main menu
-    Alarm_StopMusic(); 
+     
 
     if (current_state != MAIN_MENU) return;
     
@@ -163,6 +166,7 @@ void showMenu() {
         vTaskDelay(pdMS_TO_TICKS(50)); // Small delay to let the sound play
 
         if (menuItems[picture_flag].action) {
+            exitSubMenu = false; // ADD THIS LINE: Reset exitSubMenu before calling sub-menu
             menuItems[picture_flag].action();
             showMenuConfig();
         }

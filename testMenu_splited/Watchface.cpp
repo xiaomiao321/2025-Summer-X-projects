@@ -1,6 +1,7 @@
 #include <TFT_eSPI.h>
 #include <cmath>
 #include "Buzzer.h"
+#include "Alarm.h"
 #include <vector>
 #include "Watchface.h"
 #include "MQTT.h"
@@ -107,6 +108,7 @@ void WatchfaceMenu() {
             exitSubMenu = false; // Reset flag
             return; // Exit WatchfaceMenu
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         int encoderChange = readEncoder();
         if (encoderChange != 0) {
             selectedIndex = (selectedIndex + encoderChange + WATCHFACE_COUNT) % WATCHFACE_COUNT;
@@ -373,6 +375,7 @@ static void ChargeWatchface() {
             exitSubMenu = false;
             return;
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
 
@@ -453,6 +456,7 @@ static void Cube3DWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
 
@@ -621,6 +625,7 @@ static void GalaxyWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
 
@@ -672,6 +677,7 @@ static void SimClockWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
 
@@ -777,6 +783,7 @@ static void PlaceholderWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -907,6 +914,7 @@ static void VectorScrollWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1022,6 +1030,7 @@ static void VectorScanWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1099,6 +1108,7 @@ static void SimpleClockWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
 
@@ -1166,6 +1176,7 @@ static void shared_rain_logic(uint16_t color) {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1237,6 +1248,7 @@ static void SnowWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1300,6 +1312,7 @@ static void WavesWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1364,6 +1377,7 @@ static void NenoWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1436,6 +1450,7 @@ static void BallsWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1503,6 +1518,7 @@ static void SandBoxWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1581,6 +1597,7 @@ static void ProgressBarWatchface() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1687,6 +1704,7 @@ static void VectorScrollWatchface_SEG() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {
@@ -1836,6 +1854,7 @@ static void VectorScanWatchface_SEG() {
             }
             return; // Exit watchface
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         handlePeriodicSync();
         handleHourlyChime();
         if (readButton()) {

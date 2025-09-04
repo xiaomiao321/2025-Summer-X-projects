@@ -250,6 +250,9 @@ void Alarm_StopMusic() {
     noTone(BUZZER_PIN); // Ensure sound stops immediately
     g_alarm_is_ringing = false;
     Serial.println("Alarm music stopped by user.");
+    menuSprite.setTextFont(1);
+    menuSprite.setTextSize(1);
+
 }
 
 void Alarm_Init() {

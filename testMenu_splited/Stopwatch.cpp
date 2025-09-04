@@ -2,6 +2,7 @@
 #include "Menu.h"
 #include "MQTT.h"
 #include "Buzzer.h"
+#include "Alarm.h"
 #include "RotaryEncoder.h"
 
 #define LONG_PRESS_DURATION 1500 // milliseconds for long press to exit
@@ -98,6 +99,7 @@ void StopwatchMenu() {
             exitSubMenu = false; // Reset flag
             return; // Exit the StopwatchMenu function
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         button_pressed = readButton();
 
         // Button press handling

@@ -6,6 +6,7 @@
 #include "Menu.h"
 #include "MQTT.h"
 #include "RotaryEncoder.h"
+#include "Alarm.h"
 #include <math.h>
 
 MeterWidget volts = MeterWidget(&tft);
@@ -110,6 +111,11 @@ void ADCMenu() {
             stopADCTask = true; // Signal the background task to stop
             vTaskDelay(pdMS_TO_TICKS(200)); // Wait for task to stop
             break;
+        }
+        if (g_alarm_is_ringing) { // ADDED LINE
+            stopADCTask = true; // Signal the background task to stop
+            vTaskDelay(pdMS_TO_TICKS(200)); // Wait for task to stop
+            break; // Exit loop
         }
         if (readButton()) {
             stopADCTask = true;

@@ -4,6 +4,7 @@
 #include "img.h"
 #include "LED.h"
 #include "Buzzer.h"
+#include "Alarm.h"
 #include "weather.h"
 #include "performance.h"
 #include "DS18B20.h"
@@ -65,8 +66,12 @@ void TimeChallengeGame();
 void drawGameIcons(int16_t offset);
 
 // --- Button Detection (Strictly copied from Buzzer.cpp) ---
-bool gamesDetectDoubleClick() {
+bool gamesDetectDoubleClick(bool reset = false) {
   static unsigned long lastClickTime = 0;
+  if (reset) {
+      lastClickTime = 0;
+      return false; // Not a double click, just reset
+  }
   unsigned long currentTime = millis();
   if (currentTime - lastClickTime < 500) { // 500ms 内两次点击
     lastClickTime = 0;
@@ -155,11 +160,14 @@ void GamesMenu() {
     game_display = INITIAL_X_OFFSET;
     drawGameIcons(game_display);
 
+    gamesDetectDoubleClick(true); // Reset double click state on entry
+
     // State for delayed single-click in GamesMenu
     static unsigned long gamesMenuLastClickTime = 0;
     static bool gamesMenuSingleClickPending = false;
 
     while (true) {
+        if (exitSubMenu || g_alarm_is_ringing) { return; } // ADDED LINE
         if (readButtonLongPress()) { return; }
         int direction = readEncoder();
         if (direction != 0) {
@@ -299,6 +307,7 @@ void ConwayGame() {
             exitSubMenu = false; // Reset flag
             return; // Exit game
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         unsigned long currentTime = millis();
 
         // Auto-run logic
@@ -310,6 +319,13 @@ void ConwayGame() {
 
         // Button handling for exit
         if (readButtonLongPress()) { return; }
+        // ADD THIS BLOCK
+        if (readButton()) {
+            if (gamesDetectDoubleClick()) {
+                //exitSubMenu = true; // Signal to exit
+                return; // Exit game
+            }
+        }
         vTaskDelay(pdMS_TO_TICKS(10)); // Small delay for responsiveness
     }
 }
@@ -344,6 +360,7 @@ void BuzzerTapGame() {
             noTone(BUZZER_PIN);
             return; // Exit game
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         unsigned long currentTime = millis();
 
         // Play tone
@@ -357,6 +374,11 @@ void BuzzerTapGame() {
             noTone(BUZZER_PIN); // Stop any ongoing tone
             return; // Exit
         } else if (readButton()) { // Handle short clicks for gameplay
+            if (gamesDetectDoubleClick()) { // Double click detected
+                //exitSubMenu = true; // Signal to exit
+                noTone(BUZZER_PIN); // Stop any ongoing tone
+                return; // Exit game
+            }
             // Check if tap was within window
             if (currentTime - lastToneTime > 0 && currentTime - lastToneTime < TAP_WINDOW_MS) {
                 buzzerTapScore++;
@@ -413,6 +435,7 @@ void TimeChallengeGame() {
             exitSubMenu = false; // Reset flag
             return; // Exit game
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         unsigned long currentTime = millis();
 
         if (!gameEnded) {
@@ -453,6 +476,10 @@ void TimeChallengeGame() {
 
         if (readButtonLongPress()) { return; } // Exit game
         else if (readButton()) { // Handle short clicks for gameplay
+            if (gamesDetectDoubleClick()) { // Double click detected
+                //exitSubMenu = true; // Signal to exit
+                return; // Exit game
+            }
             if (!gameEnded) {
                 pressTime = currentTime;
                 gameEnded = true;
@@ -507,11 +534,16 @@ void flappy_bird_game() {
             exitSubMenu = false; // Reset flag
             return; // Exit game
         }
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         if (readButtonLongPress()) { return; }
 
         // ADD THIS BLOCK
         if (readButton()) {
-            lastClickTime = millis();
+            if (gamesDetectDoubleClick()) { // Double click detected
+               // exitSubMenu = true; // Signal to exit
+                return; // Exit game
+            }
+            lastClickTime = millis(); // For single click game logic
         }
 
         // --- Logic ---

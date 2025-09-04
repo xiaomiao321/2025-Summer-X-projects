@@ -507,8 +507,12 @@ void Buzzer_PlayMusic_Task(void *pvParameters) {
 }
 
 // 双击检测
-bool detectDoubleClick() {
+bool detectDoubleClick(bool reset = false) {
   static unsigned long lastClickTime = 0;
+  if (reset) {
+      lastClickTime = 0;
+      return false; // Not a double click, just reset
+  }
   unsigned long currentTime = millis();
   if (currentTime - lastClickTime < 500) {
     lastClickTime = 0;
@@ -531,6 +535,8 @@ void BuzzerMenu() {
   displayOffset = 0;
   firstDraw = true;
   isPaused = false;
+
+  detectDoubleClick(true); // Reset double click state on entry
 
   // 歌曲选择循环
 select_song:

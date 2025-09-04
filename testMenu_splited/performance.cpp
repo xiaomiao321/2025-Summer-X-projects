@@ -3,6 +3,7 @@
 #include "Menu.h"
 #include "MQTT.h"
 #include "RotaryEncoder.h"
+#include "Alarm.h"
 // -----------------------------
 // 🔧 配置区
 // -----------------------------
@@ -302,6 +303,9 @@ void performanceMenu() {
         vTaskDelete(xTaskGetHandle("Serial_Rx"));
         vSemaphoreDelete(xPCDataMutex);
         break;
+    }
+    if (g_alarm_is_ringing) { // ADDED LINE
+        break; // Exit loop to perform cleanup
     }
     if (readButton()) {
       vTaskDelete(xTaskGetHandle("Perf_Show"));

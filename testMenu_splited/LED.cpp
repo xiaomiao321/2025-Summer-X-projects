@@ -1,5 +1,6 @@
 #include "LED.h"
 #include "RotaryEncoder.h"
+#include "Alarm.h"
 #include <TFT_eSPI.h>
 #include "Menu.h"
 #include "MQTT.h" // For access to menuSprite
@@ -89,6 +90,7 @@ void LEDMenu() {
             exitSubMenu = false; // Reset flag
             break;
         }
+        if (g_alarm_is_ringing) { break; } // ADDED LINE
         int encoderChange = readEncoder();
         if (encoderChange != 0) {
             needsRedraw = true;

@@ -3,7 +3,7 @@
 #include "RotaryEncoder.h"
 #include "Buzzer.h"
 #include "animation.h" // For smoothArc
-
+#include "Alarm.h"
 // --- Configuration ---
 const unsigned long WORK_DURATION_SECS = 25 * 60;
 const unsigned long SHORT_BREAK_DURATION_SECS = 5 * 60;
@@ -113,6 +113,7 @@ void PomodoroMenu() {
     unsigned long last_draw_time = 0; // For controlling redraw frequency
 
     while(true) {
+        if (g_alarm_is_ringing) { return; } // ADDED LINE
         if (readButtonLongPress()) {
             tone(BUZZER_PIN, 1500, 100);
             menuSprite.setTextFont(1); // Reset font on exit

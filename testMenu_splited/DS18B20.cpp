@@ -6,6 +6,7 @@
 #include <DallasTemperature.h>
 #include "Menu.h"
 #include "RotaryEncoder.h"
+#include "Alarm.h"
 
 // Graph dimensions and position
 #define TEMP_GRAPH_WIDTH  200
@@ -148,6 +149,11 @@ void DS18B20Menu() {
         stopDS18B20Task = true;
         vTaskDelay(pdMS_TO_TICKS(150)); // Wait for task to stop
         break;
+    }
+    if (g_alarm_is_ringing) { // ADDED LINE
+        stopDS18B20Task = true; // Signal task to stop
+        vTaskDelay(pdMS_TO_TICKS(150)); // Give task time to stop
+        break; // Exit loop
     }
     if (readButton()) {
       stopDS18B20Task = true;

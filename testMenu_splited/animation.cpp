@@ -2,6 +2,7 @@
 #include "Menu.h"
 #include "MQTT.h"
 #include "RotaryEncoder.h"
+#include "Alarm.h"
 #include "Buzzer.h" // For BUZZER_PIN
 #include "LED.h" // Include LED.h to use the global strip object
 
@@ -83,6 +84,13 @@ void AnimationMenu()
         }
         vTaskDelay(pdMS_TO_TICKS(200)); // Wait for task to stop
         break;
+    }
+    if (g_alarm_is_ringing) { // ADDED LINE
+        if (animationTaskHandle != NULL) {
+            stopAnimationTask = true; // Signal the background task to stop
+        }
+        vTaskDelay(pdMS_TO_TICKS(200)); // Wait for task to stop
+        break; // Exit loop
     }
     if(readButton())
     {
