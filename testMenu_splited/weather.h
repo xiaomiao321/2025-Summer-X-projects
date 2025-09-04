@@ -34,5 +34,6 @@ bool fetchWeather();
 void silentSyncTime();
 void silentFetchWeather();
 bool ensureWiFiConnected();
+void TimeUpdate_Task(void *pvParameters);
 
 #endif

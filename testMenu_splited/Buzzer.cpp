@@ -46,32 +46,6 @@ const Song songs[] PROGMEM= {
 };
 const int numSongs = sizeof(songs) / sizeof(songs[0]);
 
-// Color scheme structure
-typedef struct {
-  uint16_t bgColorStart; // Background gradient start color
-  uint16_t bgColorEnd;   // Background gradient end color
-  uint16_t frameColor1;  // Frame color 1
-  uint16_t frameColor2;  // Frame color 2
-  uint16_t frameColor3;  // Frame color 3
-  uint16_t textColor;    // Normal text color
-  uint16_t highlightColor; // Highlighted text color
-} ColorScheme;
-
-// Define some color schemes
-const ColorScheme colorSchemes[] = {
-  // Scheme 0: Default Blue
-  {TFT_BLUE, TFT_CYAN, TFT_CYAN, TFT_WHITE, TFT_BLUE, TFT_WHITE, TFT_YELLOW},
-  // Scheme 1: Greenish
-  {TFT_DARKGREEN, TFT_GREEN, TFT_GREEN, TFT_WHITE, TFT_GREENYELLOW, TFT_WHITE, TFT_ORANGE},
-  // Scheme 2: Purplish
-  {TFT_PURPLE, TFT_MAGENTA, TFT_MAGENTA, TFT_WHITE, TFT_PINK, TFT_WHITE, TFT_CYAN},
-  // Scheme 3: Reddish
-  {TFT_MAROON, TFT_RED, TFT_RED, TFT_WHITE, TFT_ORANGE, TFT_WHITE, TFT_YELLOW},
-  // Scheme 4: Greyish
-  {TFT_DARKGREY, TFT_LIGHTGREY, TFT_LIGHTGREY, TFT_WHITE, TFT_SILVER, TFT_WHITE, TFT_YELLOW},
-};
-const int numColorSchemes = sizeof(colorSchemes) / sizeof(colorSchemes[0]);
-
 // Map frequency to a more distinct color for NeoPixel
 uint32_t mapFrequencyToColor(int frequency) {
   if (frequency == 0) return strip.Color(0, 0, 0); // Rest note is off
@@ -88,23 +62,6 @@ uint32_t mapFrequencyToColor(int frequency) {
   } else {
     return strip.Color(128, 0, 255); // Purple
   }
-}
-
-// Helper function to interpolate 565 colors
-uint16_t interpolateColor(uint16_t color1, uint16_t color2, float ratio) {
-  uint8_t r1 = (color1 >> 11) & 0x1F;
-  uint8_t g1 = (color1 >> 5) & 0x3F;
-  uint8_t b1 = (color1) & 0x1F;
-
-  uint8_t r2 = (color2 >> 11) & 0x1F;
-  uint8_t g2 = (color2 >> 5) & 0x3F;
-  uint8_t b2 = (color2) & 0x1F;
-
-  uint8_t r = r1 + (r2 - r1) * ratio;
-  uint8_t g = g1 + (g2 - g1) * ratio;
-  uint8_t b = b1 + (b2 - b1) * ratio;
-
-  return tft.color565(r, g, b);
 }
 
 // LED effects (blocking versions, to be run in separate task)
@@ -153,60 +110,21 @@ float calculateSongDuration(const Song* song) {
   int totalMs = 0;
   for (int i = 0; i < song->length; i++) {
     int duration = pgm_read_word(song->durations+i);
-    totalMs += duration * 1.3;
+    totalMs += duration;
   }
   return totalMs / 1000.0;
 }
 
-// 颜色变暗函数
-uint16_t darkenColor(uint16_t color, float factor) {
-    uint8_t r = (color >> 11) & 0x1F;
-    uint8_t g = (color >> 5) & 0x3F;
-    uint8_t b = color & 0x1F;
-    
-    r = constrain(r * (1 - factor), 0, 31);
-    g = constrain(g * (1 - factor), 0, 63);
-    b = constrain(b * (1 - factor), 0, 31);
-    
-    return (r << 11) | (g << 5) | b;
-}
-
 // 显示歌曲选择列表
 void displaySongList(int selectedIndex) {
-  const ColorScheme& currentScheme = colorSchemes[songs[selectedIndex].colorSchemeIndex];
+  // 始终使用黑色背景
+  tft.fillScreen(TFT_BLACK);
   
-  // 绘制渐变背景
-  for (int y = 0; y < 240; y++) {
-    uint16_t interpolatedColor = interpolateColor(
-      currentScheme.bgColorStart, 
-      currentScheme.bgColorEnd, 
-      (float)y / 239.0
-    );
-    tft.drawFastHLine(0, y, 240, interpolatedColor);
-  }
-  
-  // 绘制动态边框
-  static int frameColorIndex = 0;
-  uint16_t frameColors[] = {
-    currentScheme.frameColor1, 
-    currentScheme.frameColor2, 
-    currentScheme.frameColor3
-  };
-  tft.drawRoundRect(5, 5, 230, 230, 8, frameColors[frameColorIndex % 3]);
-  frameColorIndex++;
-  
-  // 绘制标题区域
-  tft.fillRoundRect(10, 10, 220, 35, 5, interpolateColor(
-    currentScheme.bgColorStart, 
-    currentScheme.bgColorEnd, 
-    0.1f
-  ));
-  
-  // 设置标题"歌曲菜单"居中显示
-  tft.setTextColor(currentScheme.highlightColor, TFT_TRANSPARENT);
+  // 绘制标题
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(2);
   tft.setTextDatum(MC_DATUM);
-  tft.drawString("♪ 歌曲菜单 ♪", 120, 28);
+  tft.drawString("Music Menu", 120, 28);
   
   // 绘制歌曲列表
   tft.setTextWrap(true);
@@ -216,137 +134,165 @@ void displaySongList(int selectedIndex) {
    
     int yPos = 60 + i * 50;
     
-    // 清除行背景，使用渐变效果
-    uint16_t rowBgColor = interpolateColor(
-      currentScheme.bgColorStart, 
-      currentScheme.bgColorEnd, 
-      (float)yPos/239.0
-    );
-    
-    // 为每一行添加圆角矩形背景
-    tft.fillRoundRect(10, yPos - 18, 220, 36, 5, rowBgColor);
-    
     // 选中的歌曲高亮显示
     if (songIdx == selectedIndex) {
-      // 使用更深的颜色作为高亮背景，确保文字清晰
-      uint16_t darkHighlight = darkenColor(currentScheme.highlightColor, 0.3);
-      tft.fillRoundRect(10, yPos - 18, 220, 36, 5, darkHighlight);
+      // 深蓝色背景
+      tft.fillRoundRect(10, yPos - 18, 220, 36, 5, 0x001F); // 0x001F is a deep blue color
       
-      // 歌曲名称 - 白色文字，透明背景，居中显示
+      // 歌曲名称 - 白色文字
       tft.setTextSize(2);
-      tft.setTextColor(TFT_WHITE, TFT_TRANSPARENT);
+      tft.setTextColor(TFT_WHITE, 0x001F);
       tft.setTextDatum(MC_DATUM);
       tft.drawString(songs[songIdx].name, 120, yPos);
-      
-      // 添加播放指示器
-      tft.fillCircle(210, yPos, 5, TFT_WHITE);
-      tft.fillCircle(210, yPos, 3, darkHighlight);
     } else {
-      // 未选中的歌曲 - 使用主题文本色，透明背景，居中显示
+      // 未选中的歌曲 - 黑色背景
+      tft.fillRoundRect(10, yPos - 18, 220, 36, 5, TFT_BLACK);
+      
+      // 歌曲名称 - 白色文字
       tft.setTextSize(1);
-      tft.setTextColor(currentScheme.textColor, TFT_TRANSPARENT);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.setTextDatum(MC_DATUM);
       tft.drawString(songs[songIdx].name, 120, yPos);
-      
-      // 添加列表标记
-      tft.fillCircle(15, yPos, 2, currentScheme.textColor);
     }
   }
-  
-  // // 添加滚动指示器（如果有更多歌曲）
-  // if (numSongs > visibleSongs) {
-  //   int scrollPos = map(displayOffset, 0, numSongs - visibleSongs, 200, 220);
-  //   tft.fillRoundRect(225, scrollPos, 10, 20, 3, currentScheme.highlightColor);
-  // }
   
   // 重置文本对齐方式
   tft.setTextDatum(TL_DATUM);
 }
 
+// Helper function to interpolate 565 colors
+uint16_t interpolateColor(uint16_t color1, uint16_t color2, float ratio) {
+  uint8_t r1 = (color1 >> 11) & 0x1F;
+  uint8_t g1 = (color1 >> 5) & 0x3F;
+  uint8_t b1 = (color1) & 0x1F;
 
-void drawSpectrum(const ColorScheme& scheme) {
-  tft.fillRect(5, 165, 230, 70, interpolateColor(scheme.bgColorStart, scheme.bgColorEnd, (float)165 / 239.0));
+  uint8_t r2 = (color2 >> 11) & 0x1F;
+  uint8_t g2 = (color2 >> 5) & 0x3F;
+  uint8_t b2 = (color2) & 0x1F;
 
-  int barWidth = 230 / NUM_BANDS;
-  for (int i = 0; i < NUM_BANDS; i++) {
-    int barHeight = spectrum[i] * 100;
-    if (barHeight > 70) {
-      barHeight = 70;
-    }
-    uint16_t barColor = TFT_GREEN;
-    tft.fillRect(5 + i * barWidth, 235 - barHeight, barWidth - 2, barHeight, barColor);
-  }
+  uint8_t r = r1 + (r2 - r1) * ratio;
+  uint8_t g = g1 + (g2 - g1) * ratio;
+  uint8_t b = b1 + (b2 - b1) * ratio;
+
+  return tft.color565(r, g, b);
+}
+
+// Helper to format time in MM:SS
+void formatTime(char* buf, int totalSeconds) {
+  int minutes = totalSeconds / 60;
+  int seconds = totalSeconds % 60;
+  sprintf(buf, "%02d:%02d", minutes, seconds);
 }
 
 // 显示播放界面
-void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int currentNote, const ColorScheme& scheme) {
-    if (!getLocalTime(&timeinfo)) {
-      // Handle error if time is not available
-      return;
-    }
+void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int currentNote, float elapsedTime) {
+    static PlayMode lastPlayMode = (PlayMode)-1;
+    static char lastTimeStr[20] = "";
     static int lastNoteIndex = -1;
-    static PlayMode lastPlayMode = currentPlayMode;
-    static char lastTimeStr[20] = ""; // 保存上次显示的时间字符串
-
-    // 格式化当前时间
-    char timeStr[20];
-    strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
-
-    tft.fillRect(10, 50, 200, 40, interpolateColor(scheme.bgColorStart, scheme.bgColorEnd, (float)50/239.0));
-    tft.setTextSize(1);
-    tft.setTextColor(scheme.textColor, TFT_TRANSPARENT);
-
-    // 显示时间
-    tft.setCursor(10, 60);
-    tft.println(timeStr);
-
-    // 显示播放模式
-    tft.setCursor(10, 70);
-    switch (currentPlayMode) {
-        case SINGLE_LOOP: tft.print("Single Loop"); break;
-        case LIST_LOOP: tft.print("List Loop"); break;
-        case RANDOM_PLAY: tft.print("Random"); break;
-    }
-    lastPlayMode = currentPlayMode;
-    strcpy(lastTimeStr, timeStr); // 更新上次时间字符串
+    static float lastElapsedTime = -1.0;
 
     if (firstDraw) {
-        for (int y = 0; y < 240; y++) {
-            uint16_t interpolatedColor = interpolateColor(scheme.bgColorStart, scheme.bgColorEnd, (float)y / 239.0);
-            tft.drawFastHLine(0, y, 240, interpolatedColor);
-        }
-        tft.setTextColor(scheme.textColor, TFT_TRANSPARENT);
-        tft.setTextSize(2);
-        tft.setCursor(10, 30);
-        tft.println(songs[songIndex].name);
+        tft.fillScreen(TFT_BLACK);
+        
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(3); // Changed to size 3
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString(songs[songIndex].name, 120, 30);
+        tft.setTextDatum(TL_DATUM);
 
+        // Draw progress bar background and time labels
+        tft.fillRoundRect(10, 130, 220, 10, 5, TFT_DARKGREY);
+        char totalTimeStr[6];
+        formatTime(totalTimeStr, (int)calculateSongDuration(&songs[songIndex]));
         tft.setTextSize(1);
-        tft.setCursor(10, 100);
-        tft.printf("Duration: %.1f s", calculateSongDuration(&songs[songIndex]));
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.drawString(totalTimeStr, 200, 115); // Total time
+        char elapsedTimeStr[6];
+        formatTime(elapsedTimeStr, 0);
+        tft.drawString(elapsedTimeStr, 20, 115); // Initial elapsed time
 
-        tft.fillRect(20, 130, 200, 10, TFT_DARKGREY);
+        // Add note count display
+        char noteCountStr[20];
+        sprintf(noteCountStr, "%d / %d", 1, songs[songIndex].length); // Initial note count is 1
+        tft.setTextDatum(MC_DATUM); // Temporarily set datum to center for this string
+        tft.drawString(noteCountStr, 120, 115); // Centered above progress bar
+        tft.setTextDatum(TL_DATUM); // Reset datum
 
         firstDraw = false;
-    } else if (noteIndex != lastNoteIndex) {
-        static int frameColorIndex = 0;
-        uint16_t frameColors[] = {scheme.frameColor1, scheme.frameColor2, scheme.frameColor3};
-        tft.drawRect(5, 5, 230, 230, frameColors[frameColorIndex % 3]);
-        frameColorIndex++;
+        lastPlayMode = (PlayMode)-1;
+        strcpy(lastTimeStr, "");
+        lastNoteIndex = -1;
+        lastElapsedTime = -1.0;
+    }
 
-        tft.fillRect(10, 80, 200, 20, interpolateColor(scheme.bgColorStart, scheme.bgColorEnd, (float)80 / 239.0));
+    if(lastPlayMode != currentPlayMode){
+        // Clear a larger area for centered text with size 2
+        tft.fillRect(0, 55, 240, 30, TFT_BLACK); // Clear from x=0, y=55, width=240, height=30
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(2); // Set font size to 2
+        tft.setTextDatum(MC_DATUM); // Set datum to Middle-Center
+        switch (currentPlayMode) {
+            case SINGLE_LOOP: tft.drawString("Single Loop", 120, 70); break; // Centered at x=120, y=70
+            case LIST_LOOP: tft.drawString("List Loop", 120, 70); break;
+            case RANDOM_PLAY: tft.drawString("Random", 120, 70); break;
+        }
+        tft.setTextDatum(TL_DATUM); // Reset datum to Top-Left
+        lastPlayMode = currentPlayMode;
+    }
+
+    if (!getLocalTime(&timeinfo)) { return; }
+    char timeStr[20];
+    strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
+    if (strcmp(timeStr, lastTimeStr) != 0) {
+        // Clear a larger area for centered text with size 2
+        tft.fillRect(0, 85, 240, 30, TFT_BLACK); // Clear from x=0, y=85, width=240, height=30
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(2); // Set font size to 2
+        tft.setTextDatum(MC_DATUM); // Set datum to Middle-Center
+        tft.drawString(timeStr, 120, 100); // Centered at x=120, y=100
+        tft.setTextDatum(TL_DATUM); // Reset datum to Top-Left
+        strcpy(lastTimeStr, timeStr);
+    }
+
+    if (noteIndex != lastNoteIndex) {
+        int progressWidth = (noteIndex + 1) * 220 / totalNotes; // Changed 200 to 220
+        tft.fillRoundRect(10, 130, progressWidth, 10, 5, TFT_WHITE); // Changed x from 20 to 10
+
+        // Update note count display
+        tft.fillRect(120, 115, 60, 12, TFT_BLACK); // Clear previous note count area
+        char noteCountStr[20];
+        sprintf(noteCountStr, "%d / %d", noteIndex + 1, totalNotes);
         tft.setTextSize(1);
-        tft.setTextColor(scheme.textColor, TFT_TRANSPARENT);
-        tft.setCursor(10, 80);
-        tft.printf("Note: %d/%d", noteIndex + 1, totalNotes);
-
-        int progressWidth = (noteIndex + 1) * 200 / totalNotes;
-        tft.fillRect(20, 130, progressWidth, 10, scheme.highlightColor);
-        tft.fillRect(20 + progressWidth, 130, 200 - progressWidth, 10, TFT_DARKGREY);
-
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextDatum(MC_DATUM); // Temporarily set datum to center for this string
+        tft.drawString(noteCountStr, 120, 115); // Centered above progress bar
+        tft.setTextDatum(TL_DATUM); // Reset datum
+        
+        if ((int)elapsedTime != (int)lastElapsedTime) {
+            char elapsedTimeStr[6];
+            formatTime(elapsedTimeStr, (int)elapsedTime);
+            tft.fillRect(20, 115, 40, 12, TFT_BLACK); // Clear previous time
+            tft.drawString(elapsedTimeStr, 20, 115);
+            lastElapsedTime = elapsedTime;
+        }
         lastNoteIndex = noteIndex;
     }
 
-    drawSpectrum(scheme);
+    // Spectrum analyzer
+    tft.fillRect(5, 165, 230, 70, TFT_BLACK); // Clear previous spectrum
+    int barWidth = 8;
+    int barSpacing = 14;
+    uint16_t deepBlue = TFT_CYAN;
+    for (int i = 0; i < NUM_BANDS; i++) {
+        int barHeight = spectrum[i] * 100;
+        if (barHeight > 70) barHeight = 70;
+        if (barHeight < 5) barHeight = 0; // Don't draw tiny bars
+
+        if(barHeight > 0) {
+            uint16_t barColor = TFT_CYAN;
+            tft.fillRoundRect(10 + i * barSpacing, 235 - barHeight, barWidth, barHeight, 4, barColor);
+        }
+    }
 }
 
 // 蜂鸣器初始化
@@ -426,7 +372,6 @@ void Buzzer_Task(void *pvParameters) {
       noTone(BUZZER_PIN);
       strip.clear();
       strip.show();
-      stopBuzzerTask = false;
       Serial.println("Buzzer_Task 被外部中断，已停止");
       firstDraw = true;
       currentNoteIndex = 0; // Reset note index
@@ -445,7 +390,6 @@ void Buzzer_Task(void *pvParameters) {
         noTone(BUZZER_PIN);
         strip.clear();
         strip.show();
-        stopBuzzerTask = false;
         firstDraw = true;
         currentNoteIndex = 0; // Reset note index
         goto exit_loop;
@@ -485,7 +429,14 @@ void Buzzer_Task(void *pvParameters) {
         spectrum[j] /= (end - start);
       }
 
-      displayPlayingSong(songIndex, i, song.length, note, colorSchemes[song.colorSchemeIndex]);
+      // Calculate elapsed time
+      float elapsedTime = 0;
+      for (int j = 0; j <= i; j++) { // <= i because i is the current note index
+          elapsedTime += pgm_read_word(song.durations+j);
+      }
+      elapsedTime /= 1000.0; // convert to seconds
+
+      displayPlayingSong(songIndex, i, song.length, note, elapsedTime);
       vTaskDelay(pdMS_TO_TICKS(duration));
       noTone(BUZZER_PIN);
       currentNoteIndex = i + 1; // Update note index after playing
@@ -670,10 +621,7 @@ select_song:
         if (ledTaskHandle != NULL) {
           vTaskDelete(ledTaskHandle); // Delete Led_Task
         }
-        TaskHandle_t initHandle = xTaskGetHandle("Buzzer_Init");
-        if (initHandle != NULL) {
-          vTaskDelete(initHandle);
-        }
+        
         // display = 48;
         // picture_flag = 0;
         // showMenuConfig();

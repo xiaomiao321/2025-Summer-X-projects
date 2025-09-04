@@ -108,7 +108,7 @@ struct GameItem {
 
 // Game list with placeholder icons and function pointers
 const GameItem gameItems[] = {
-    {"Conway's Game", Conway, ConwayGame},
+    {"Conway's Game", bird_big, ConwayGame},
     // {"Snake Game", snake, tanchisheGame},
     {"Buzzer Tap", bird_big, BuzzerTapGame},
     {"Time Challenge", Timer, TimeChallengeGame},
@@ -503,7 +503,16 @@ void flappy_bird_game() {
 
     while (true) {
         // --- Exit Condition ---
+        if (exitSubMenu) { // ADD THIS LINE
+            exitSubMenu = false; // Reset flag
+            return; // Exit game
+        }
         if (readButtonLongPress()) { return; }
+
+        // ADD THIS BLOCK
+        if (readButton()) {
+            lastClickTime = millis();
+        }
 
         // --- Logic ---
         if (!start_game) {

@@ -729,6 +729,16 @@ void silentFetchWeather() {
     Serial.println("WiFi disconnected after silent weather fetch.");
 }
 
+void TimeUpdate_Task(void *pvParameters) {
+    for(;;) {
+        // Only update if time has been synced at least once
+        if (synced) {
+            getLocalTime(&timeinfo); // Update the global timeinfo struct
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Update every second
+    }
+}
+
 void weatherMenu() {
     if (exitSubMenu) { exitSubMenu = false; return; }
 

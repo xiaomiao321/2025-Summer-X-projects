@@ -38,13 +38,13 @@ uint8_t picture_flag = 0;           // Current selected menu item index
 const MenuItem menuItems[] = {
     {"Clock", Weather, &weatherMenu},
     {"Countdown", Countdown, &CountdownMenu},
-    {"Alarm", Timer, &AlarmMenu}, // Added Alarm Menu
-    {"Pomodoro", Countdown, &PomodoroMenu},
+    {"Alarm", alarm_img, &AlarmMenu}, // Added Alarm Menu
+    {"Pomodoro", tomato, &PomodoroMenu},
     {"Stopwatch", Timer, &StopwatchMenu},
     {"Music", Music, &BuzzerMenu},
     {"Performance", Performance, &performanceMenu},
     {"Temperature",Temperature, &DS18B20Menu},
-    {"Animation",Animation, &AnimationMenu},
+    {"Animation",LED, &AnimationMenu},
     {"Games", Games, &GamesMenu},
     {"LED", LED, &LEDMenu},
     {"ADC", ADC, &ADCMenu},

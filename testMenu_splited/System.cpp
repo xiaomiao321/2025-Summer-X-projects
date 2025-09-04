@@ -257,6 +257,7 @@ void bootSystem() {
     tft.fillScreen(TFT_BLACK);
     synced = false;
     syncTime();
+    xTaskCreate(TimeUpdate_Task, "Time Update Task", 2048, NULL, 5, NULL); // Add this line
     showMenuConfig();
 }
 
