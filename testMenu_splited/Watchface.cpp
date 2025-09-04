@@ -12,7 +12,7 @@
 
 #define MENU_FONT 1
 #define WEATHER_INTERVAL_MIN 30
-#define TIME_INTERVAL_MIN 360
+#define TIME_INTERVAL_MIN 60
 
 // --- Time and Date Colors ---
 #define TIME_MAIN_COLOR     TFT_CYAN

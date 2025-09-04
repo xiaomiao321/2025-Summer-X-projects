@@ -23,6 +23,7 @@ extern char humidity[10];
 extern char reporttime[25];
 extern char lastSyncTimeStr[45]; // To display last sync time
 extern char lastWeatherSyncStr[45]; // To display last weather sync status
+extern bool synced;
 
 void weatherMenu();
 void syncTime();

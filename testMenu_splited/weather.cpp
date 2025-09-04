@@ -10,6 +10,7 @@
 #include "img.h"
 #include "WiFiManager.h"
 #include "System.h"
+bool synced = false;
 // WiFi & Time
 const char* ssid     = "xiaomiao_hotspot";
 const char* password = "xiaomiao123";
@@ -133,6 +134,21 @@ bool ensureWiFiConnected() {
 }
 
 bool connectWiFi() {
+    if(WiFi.status() == WL_CONNECTED)
+    {
+        tft.fillScreen(BG_COLOR);
+        tft.setTextFont(1);
+        tft.setTextSize(1);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(TFT_GREEN);
+        tft.drawString("WiFi Already Connected", tft.width()/2, 15);
+        tft.setTextSize(2);
+        tft.drawString("IP:" + WiFi.localIP().toString(), tft.width()/2, 85);
+        tft.drawString("Gateway:" + WiFi.gatewayIP().toString(), tft.width()/2, 155);
+        tft.drawString("Signal:" + String(WiFi.RSSI()) + " dBm", tft.width()/2, tft.height()-15);
+        delay(2000);
+        return true;
+    }
     tft.fillScreen(BG_COLOR);
     tft.setTextSize(2);
     tft.setTextDatum(MC_DATUM);
@@ -375,17 +391,44 @@ bool connectWiFi() {
 }
 
 void syncTime() {
-    if (!wifi_connected) {
+    if (WiFi.status() != WL_CONNECTED) {
         Serial.printf("WiFi not connected, cannot sync time.");
         sprintf(lastSyncTimeStr, "Time FAILED (No WiFi) at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         tft.fillScreen(BG_COLOR);
         tft.setTextDatum(MC_DATUM);
+        tft.setTextFont(2);
         tft.setTextSize(2);
         tft.drawString("WiFi Not Connected", 120, 80);
         tft.setTextSize(2);
-        tft.drawString("Cannot sync time.", 120, 110);
+        tft.drawString("Cannot sync time.", 120, 160);
         tft.setTextSize(2);
         delay(2000);
+        tft.setTextFont(1);
+        tft.setTextSize(1);
+        return;
+    }
+    if(synced){
+        tft.fillScreen(BG_COLOR);
+        tft.setTextSize(1);
+        tft.setTextDatum(MC_DATUM);
+        tft.drawString("Time Already Synced", tft.width()/2, 15);
+        tft.drawString("Last Synced Time:", tft.width()/2, 20);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        const char* weekDayStr[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
+
+        tft.setTextSize(3);
+        char time_str_buffer[50];
+        tft.drawString(weekDayStr[timeinfo.tm_wday], tft.width()/2, 45); // Y=45
+        sprintf(time_str_buffer,"%d-%02d-%02d", timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday);
+        tft.drawString(time_str_buffer, tft.width()/2, 75);
+
+        sprintf(time_str_buffer,"%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        tft.setTextSize(5);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.drawString(time_str_buffer, tft.width()/2, tft.height()/2 + 20);
+        delay(2000);      
+
         return;
     }
 
@@ -409,7 +452,6 @@ void syncTime() {
 
     int attempts = 0;
     int max_attempts = 5;
-    bool synced = false;
 
     while (attempts < max_attempts && !synced) {
         tft.drawRect(20, tft.height() - 20, 202, 17, TFT_WHITE);
@@ -483,7 +525,7 @@ bool fetchWeather() {
     const char* API_KEY  = "8a4fcc66268926914fff0c968b3c804c";
     const char* CITY_CODE = "120104";
     
-    if (!wifi_connected) {
+    if (WiFi.status() != WL_CONNECTED) {
         Serial.printf("DEBUG: fetchWeather() called, but wifi_connected is false.");
         sprintf(lastWeatherSyncStr, "Weather FAILED (No WiFi) at %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
         return false;
@@ -690,11 +732,10 @@ void silentFetchWeather() {
 void weatherMenu() {
     if (exitSubMenu) { exitSubMenu = false; return; }
 
-    bool connected = connectWiFi(); 
+    connectWiFi(); 
     //bool connected = connectWiFi_with_Manager(); // Connect WiFi when entering the menu
     if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to connect
 
-    if (connected) {
     syncTime();
     if (exitSubMenu) { exitSubMenu = false; return; } // Check after trying to sync
 
@@ -705,7 +746,6 @@ void weatherMenu() {
     // WiFi.disconnect(true);
     // WiFi.mode(WIFI_OFF);
     // Serial.println("WiFi disconnected after initial setup.");
-    }
 
     // After all operations, or if connection FAILED, proceed to the watchface
     // The watchface itself has an exit loop.

@@ -6,27 +6,10 @@
 #include <EEPROM.h>
 #include <freertos/task.h> // For task management
 
-#define MAX_ALARMS 5
-#define EEPROM_START_ADDR 0
-/*
- * Alarm Clock Feature for ESP32 Weather Clock
- * 
- * Style Guide:
- * - C-style, no classes.
- * - Module state managed by file-scoped static variables.
- * - UI implemented in blocking loops within dedicated functions (e.g., AlarmMenu, editAlarm).
- */
-
-#include "Alarm.h"
-#include "Menu.h"
-#include "RotaryEncoder.h"
-#include "Buzzer.h"
-#include "weather.h"
-#include <EEPROM.h>
-
-#define MAX_ALARMS 5
+#define MAX_ALARMS 10  // 增加最大闹钟数量
 #define EEPROM_START_ADDR 0
 #define EEPROM_MAGIC_KEY 0xAD // Changed magic key
+#define ALARMS_PER_PAGE 5     // 每页显示的闹钟数量
 
 // --- Bitmasks for Days of the Week ---
 const uint8_t DAY_SUN = 1; const uint8_t DAY_MON = 2; const uint8_t DAY_TUE = 4;
@@ -55,6 +38,7 @@ static int alarmSongIndex = 0; // Play song 0 by default for alarms
 
 // --- UI State Variables ---
 static int list_selected_index = 0;
+static int list_scroll_offset = 0; // 添加滚动偏移量
 static unsigned long last_click_time = 0;
 static const unsigned long DOUBLE_CLICK_WINDOW = 350; // ms
 
@@ -73,15 +57,37 @@ static void drawAlarmList();
 // Draws the main list of alarms with checkmark/cross icons
 static void drawAlarmList() {
     menuSprite.fillScreen(TFT_BLACK);
+    menuSprite.setTextFont(1); // 明确设置字体为1
+    menuSprite.setTextSize(2); // 确保文本大小重置
     menuSprite.setTextDatum(TL_DATUM);
-    menuSprite.setTextFont(2);
     menuSprite.setTextColor(TFT_WHITE);
 
-    menuSprite.drawString("Alarms", 10, 10);
+    // 绘制标题和时间
+    extern struct tm timeinfo;
+    char titleBuf[30];
+    sprintf(titleBuf, "Alarms %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min,timeinfo.tm_sec);
+    menuSprite.drawString(titleBuf, 10, 10);
+    
+    // 绘制滚动指示器（如果有更多闹钟）
+    if (alarm_count > ALARMS_PER_PAGE) {
+        char scrollIndicator[10];
+        int currentPage = list_scroll_offset / ALARMS_PER_PAGE + 1;
+        int totalPages = (alarm_count + ALARMS_PER_PAGE - 1) / ALARMS_PER_PAGE;
+        snprintf(scrollIndicator, sizeof(scrollIndicator), "%d/%d", currentPage, totalPages);
+        menuSprite.drawString(scrollIndicator, 200, 10);
+    }
+    
     menuSprite.drawFastHLine(0, 32, 240, TFT_DARKGREY);
 
-    for (int i = 0; i < MAX_ALARMS; i++) {
-        int y_pos = 45 + (i * 38);
+    // 计算可见范围内的闹钟
+    int start_index = list_scroll_offset;
+    int end_index = min(list_scroll_offset + ALARMS_PER_PAGE, alarm_count + 1); // +1 for "Add New" option
+    
+    for (int i = start_index; i < end_index; i++) {
+        int display_index = i - list_scroll_offset;
+        int y_pos = 45 + (display_index * 38);
+        
+        // 高亮当前选中的项目
         if (i == list_selected_index) {
             menuSprite.drawRoundRect(5, y_pos - 5, 230, 36, 5, TFT_YELLOW);
         }
@@ -131,8 +137,8 @@ static void drawEditScreen(const AlarmSetting& alarm, EditMode mode, int day_cur
     if (mode == EDIT_HOUR) menuSprite.fillRect(38, 115, 70, 4, TFT_YELLOW);
     else if (mode == EDIT_MINUTE) menuSprite.fillRect(132, 115, 70, 4, TFT_YELLOW);
 
-    menuSprite.setTextFont(2);
-    const char* days[] = {"S", "M", "T", "W", "T", "F", "S"};
+    menuSprite.setTextFont(1);
+    const char* days[] = {"S","M", "T", "W", "T", "F", "S"};
     for(int d=0; d<7; d++){
         int day_x = 24 + (d * 30); int day_y = 160;
         if (mode == EDIT_DAYS && d == day_cursor) menuSprite.drawRect(day_x - 10, day_y - 12, 20, 24, TFT_YELLOW);
@@ -141,7 +147,7 @@ static void drawEditScreen(const AlarmSetting& alarm, EditMode mode, int day_cur
     }
 
     int save_box_y = 205;
-    menuSprite.setTextFont(2); menuSprite.setTextColor(TFT_WHITE);
+    menuSprite.setTextFont(1); menuSprite.setTextColor(TFT_WHITE);
     if (mode == EDIT_SAVE) {
         menuSprite.fillRoundRect(40, save_box_y, 75, 30, 5, TFT_GREEN);
         menuSprite.setTextColor(TFT_BLACK);
@@ -261,7 +267,11 @@ static void editAlarm(int index) {
     drawEditScreen(temp_alarm, edit_mode, day_cursor);
 
     while(true) {
-        if (readButtonLongPress()) { menuSprite.setTextFont(1); return; }
+        if (readButtonLongPress()) { 
+            menuSprite.setTextFont(1); 
+            menuSprite.setTextSize(2); // 添加文本大小重置
+            return; 
+        }
 
         int encoder_value = readEncoder();
         if (encoder_value != 0) {
@@ -293,10 +303,14 @@ static void editAlarm(int index) {
                     alarms[index] = temp_alarm;
                 }
                 saveAlarms();
-                menuSprite.setTextFont(1); return;
+                menuSprite.setTextFont(1);
+                menuSprite.setTextSize(2);
+                return;
             } else if (edit_mode == EDIT_DELETE) {
                 if (!is_new_alarm) Alarm_Delete(index);
-                menuSprite.setTextFont(1); return;
+                menuSprite.setTextFont(1);
+                menuSprite.setTextSize(2);
+                return;
             }
             edit_mode = (EditMode)((edit_mode + 1) % 5);
             drawEditScreen(temp_alarm, edit_mode, day_cursor);
@@ -307,12 +321,29 @@ static void editAlarm(int index) {
 
 void AlarmMenu() {
     list_selected_index = 0;
+    list_scroll_offset = 0; // 重置滚动偏移
     int click_count = 0;
+    unsigned long last_update_time = 0; // 记录上次更新时间
+    const unsigned long UPDATE_INTERVAL = 1000; // 每秒更新
+    menuSprite.setTextFont(1);
+    menuSprite.setTextSize(2);
     drawAlarmList();
 
     while (true) {
+        unsigned long current_time = millis();
+        if (current_time - last_update_time >= UPDATE_INTERVAL) {
+            // 更新 timeinfo
+            extern struct tm timeinfo;
+            if (!getLocalTime(&timeinfo)) {
+                Serial.println("Failed to obtain time");
+            }
+            drawAlarmList();
+            last_update_time = current_time;
+        }
+
         if (readButtonLongPress()) { 
             menuSprite.setTextFont(1); 
+            menuSprite.setTextSize(2);
             click_count = 0; // Reset click count on long press exit
             return; 
         }
@@ -321,6 +352,14 @@ void AlarmMenu() {
         if (encoder_value != 0) {
             int max_items = (alarm_count < MAX_ALARMS) ? alarm_count + 1 : MAX_ALARMS;
             list_selected_index = (list_selected_index + encoder_value + max_items) % max_items;
+            
+            // 自动滚动逻辑
+            if (list_selected_index < list_scroll_offset) {
+                list_scroll_offset = list_selected_index;
+            } else if (list_selected_index >= list_scroll_offset + ALARMS_PER_PAGE) {
+                list_scroll_offset = list_selected_index - ALARMS_PER_PAGE + 1;
+            }
+            
             drawAlarmList();
             tone(BUZZER_PIN, 1000 + 50 * list_selected_index, 20);
         }

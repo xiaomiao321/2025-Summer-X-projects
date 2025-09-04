@@ -60,22 +60,19 @@ void typeWriterCommand(const char* text, int x, int y, uint32_t color = TFT_WHIT
 }
 
 // 显示系统信息（打字机效果）
-void displaySystemInfoTypewriter(int startY) {
-    int y = startY;
-    
+void displaySystemInfoTypewriter() {
     // 芯片信息
     #ifdef CONFIG_IDF_TARGET_ESP32
-    typeWriterCommand("Chip: ESP32", 5, y, TFT_CYAN, 40);
+    tftLogInfo("Chip: ESP32");
     #elif CONFIG_IDF_TARGET_ESP32S2
-    typeWriterCommand("Chip: ESP32-S2", 5, y, TFT_CYAN, 40);
+    tftLogInfo("Chip: ESP32-S2");
     #elif CONFIG_IDF_TARGET_ESP32S3
-    typeWriterCommand("Chip: ESP32-S3", 5, y, TFT_CYAN, 40);
+    tftLogInfo("Chip: ESP32-S3");
     #elif CONFIG_IDF_TARGET_ESP32C3
-    typeWriterCommand("Chip: ESP32-C3", 5, y, TFT_CYAN, 40);
+    tftLogInfo("Chip: ESP32-C3");
     #else
-    typeWriterCommand("Chip: Unknown ESP", 5, y, TFT_CYAN, 40);
+    tftLogInfo("Chip: Unknown ESP");
     #endif
-    y += LINE_HEIGHT;
 
     // 核心数
     char coresInfo[20];
@@ -88,74 +85,91 @@ void displaySystemInfoTypewriter(int startY) {
     #else
     sprintf(coresInfo, "Cores: %d", 1);
     #endif
-    typeWriterCommand(coresInfo, 5, y, TFT_WHITE, 35);
-    y += LINE_HEIGHT;
+    tftLogInfo(coresInfo);
 
     // CPU频率
     char cpuInfo[25];
     sprintf(cpuInfo, "CPU: %dMHz", ESP.getCpuFreqMHz());
-    typeWriterCommand(cpuInfo, 5, y, TFT_WHITE, 35);
-    y += LINE_HEIGHT;
+    tftLogInfo(cpuInfo);
 
     // 闪存信息
     char flashInfo[35];
     sprintf(flashInfo, "Flash: %dMB", ESP.getFlashChipSize() / (1024 * 1024));
-    typeWriterCommand(flashInfo, 5, y, TFT_WHITE, 35);
-    y += LINE_HEIGHT;
+    tftLogInfo(flashInfo);
 
     // 内存信息
     char heapInfo[30];
     sprintf(heapInfo, "Heap: %d bytes", ESP.getFreeHeap());
-    typeWriterCommand(heapInfo, 5, y, TFT_WHITE, 35);
-    y += LINE_HEIGHT;
+    tftLogInfo(heapInfo);
 
     // SDK版本
     char sdkInfo[25];
     sprintf(sdkInfo, "SDK: %s", ESP.getSdkVersion());
-    typeWriterCommand(sdkInfo, 5, y, TFT_WHITE, 35);
+    tftLogInfo(sdkInfo);
 }
 
 // 硬件测试函数（打字机效果）
-void hardwareTestTypewriter(int startY) {
-    int y = startY;
-    
+void hardwareTest() {
+   
     // 蜂鸣器测试
-    typeWriterCommand("Testing Buzzer...", 5, y, TFT_YELLOW, 30);
+    tftLogInfo("Testing Buzzer...");
     tone(BUZZER_PIN, 1500, 200);
     delay(300);
-    typeWriterCommand("Buzzer: OK", 5, y + LINE_HEIGHT, TFT_GREEN, 20);
-    y += LINE_HEIGHT * 2;
+    tftLogSuccess("Buzzer: OK");
 
     // 温度传感器测试
-    typeWriterCommand("Testing DS18B20...", 5, y, TFT_YELLOW, 30);
+    tftLogInfo("Testing DS18B20...");
     sensors.begin();
+    int deviceCount = sensors.getDeviceCount();
+    char deviceStr[40];
+    sprintf(deviceStr, "Found %d DS18B20 sensor(s)", deviceCount);
+    tftLogSuccess(deviceStr);
+
+    if (deviceCount == 0) {
+        tftLogError("No DS18B20 sensors detected");
+        return;
+    }
+
+    // 获取传感器分辨率
+    uint8_t resolution = sensors.getResolution();
+    char resStr[30];
+    sprintf(resStr, "Resolution: %d bits", resolution);
+    tftLogInfo(resStr);
     sensors.requestTemperatures();
-    delay(750);
+    delay(1000);
     float tempC = sensors.getTempCByIndex(0);
     if (tempC != DEVICE_DISCONNECTED_C) {
         char tempStr[30];
         sprintf(tempStr, "Temp: %.1fC OK", tempC);
-        typeWriterCommand(tempStr, 5, y + LINE_HEIGHT, TFT_GREEN, 20);
+        tftLogInfo(tempStr);
     } else {
-        typeWriterCommand("DS18B20: FAILED", 5, y + LINE_HEIGHT, TFT_RED, 20);
+        tftLogError("DS18B20: FAILED");
     }
-    y += LINE_HEIGHT * 2;
 
+    DeviceAddress deviceAddress;
+    if (sensors.getAddress(deviceAddress, 0)) {
+        char addrStr[50];
+        sprintf(addrStr, "Address: %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+                deviceAddress[0], deviceAddress[1], deviceAddress[2], deviceAddress[3],
+                deviceAddress[4], deviceAddress[5], deviceAddress[6], deviceAddress[7]);
+        tftLogInfo(addrStr);
+    } else {
+        tftLogError("FAILED to read sensor address");
+    }
     // LED测试
-    typeWriterCommand("Testing LEDs...", 5, y, TFT_YELLOW, 30);
+    tftLogInfo("Testing LEDs...");
     setLEDColor(255, 0, 0); delay(200);
     setLEDColor(0, 255, 0); delay(200);
     setLEDColor(0, 0, 255); delay(200);
     setLEDColor(0, 0, 0);
-    typeWriterCommand("LEDs: OK", 5, y + LINE_HEIGHT, TFT_GREEN, 20);
-    y += LINE_HEIGHT * 2;
+    tftLogSuccess("LEDs: OK");
 
     // ADC测试
-    typeWriterCommand("Testing ADC...", 5, y, TFT_YELLOW, 30);
+    tftLogInfo("Testing ADC...");
     uint32_t adcRaw = adc1_get_raw(ADC1_CHANNEL_2);
     char adcStr[25];
     sprintf(adcStr, "ADC: %lu OK", adcRaw);
-    typeWriterCommand(adcStr, 5, y + LINE_HEIGHT, TFT_GREEN, 20);
+    tftLogSuccess(adcStr);
 }
 
 // 开机动画函数
@@ -185,74 +199,34 @@ void bootAnimation() {
         menuSprite.pushSprite(0, 0);
         delay(50);
     }
-    // for(int i = 0;i<16;i++)
-    // {
-    //     menuSprite.fillScreen(TFT_WHITE);
-    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
-    //     menuSprite.pushSprite(0, 0);
-    //     delay(50);
-    // }
-    // for(int i = 0;i<16;i++)
-    // {
-    //     menuSprite.fillScreen(TFT_WHITE);
-    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
-    //     menuSprite.pushSprite(0, 0);
-    //     delay(50);
-    // }
-    // for(int i = 0;i<16;i++)
-    // {
-    //     menuSprite.fillScreen(TFT_WHITE);
-    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
-    //     menuSprite.pushSprite(0, 0);
-    //     delay(50);
-    // }
-    // for(int i = 0;i<16;i++)
-    // {
-    //     menuSprite.fillScreen(TFT_WHITE);
-    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
-    //     menuSprite.pushSprite(0, 0);
-    //     delay(50);
-    // }
-    // for(int i = 0;i<16;i++)
-    // {
-    //     menuSprite.fillScreen(TFT_WHITE);
-    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
-    //     menuSprite.pushSprite(0, 0);
-    //     delay(50);
-    // }
-    // for(int i = 0;i<16;i++)
-    // {
-    //     menuSprite.fillScreen(TFT_WHITE);
-    //     menuSprite.pushImage(46,45,150,148,boot_gif[i]);
-    //     menuSprite.pushSprite(0, 0);
-    //     delay(50);
-    // }
     tft.fillScreen(TFT_BLACK);
-    // tft.pushImage(46,45,150,148,boot_gif[0]);
-    // delay(100000);
-    // 显示标题
     typeWriterEffect("SYSTEM BOOT SEQUENCE", 20, 5, TFT_GREEN, 50);
     tft.drawFastHLine(0, 25, SCREEN_WIDTH, TFT_DARKGREEN);
     
     // 显示系统信息
-    displaySystemInfoTypewriter(35);
+    displaySystemInfoTypewriter();
     delay(1000);
     
     // 清屏进行硬件测试
-    tft.fillRect(0, 30, SCREEN_WIDTH, SCREEN_HEIGHT - 30, TFT_BLACK);
-    typeWriterEffect("HARDWARE TEST", 60, 35, TFT_YELLOW, 40);
+    tftClearLog();
+    tftLogInfo("HARDWARE TEST");
     tft.drawFastHLine(0, 55, SCREEN_WIDTH, TFT_DARKCYAN);
     
     // 硬件测试
-    hardwareTestTypewriter(65);
+    hardwareTest();
     delay(1000);
     
     // 完成提示
     tft.fillRect(0, 120, SCREEN_WIDTH, LINE_HEIGHT * 2, TFT_BLACK);
     tft.fillScreen(TFT_BLACK);
-    typeWriterCommand("All systems operational", 5, 120, TFT_GREEN, 25);
-    typeWriterCommand("Booting to main menu...", 5, 135, TFT_CYAN, 30);
-    
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextFont(1);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_GREEN);
+    tft.drawString("All systems operational",120,80);
+    tft.drawString("Start Connecting to WiFi...",120,160);
+    tft.setTextFont(1);
+    tft.setTextSize(1);
     delay(1500);
 }
 
@@ -281,6 +255,8 @@ void bootSystem() {
     connectWiFi_with_Manager();
     // 清屏进入主菜单
     tft.fillScreen(TFT_BLACK);
+    synced = false;
+    syncTime();
     showMenuConfig();
 }
 
@@ -335,6 +311,8 @@ void tftLogHeader(const String& title) {
 
 // 快速打字机日志函数（无时间戳）
 void tftLog(String text, uint16_t color) {
+    tft.setTextFont(1);
+    tft.setTextSize(1);
     // 检查是否需要清屏滚动
     if (current_log_lines >= LOG_MAX_LINES) {
         tftClearLog();
