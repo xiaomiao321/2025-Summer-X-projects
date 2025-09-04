@@ -412,7 +412,7 @@ void syncTime() {
         tft.setTextSize(1);
         tft.setTextDatum(MC_DATUM);
         tft.drawString("Time Already Synced", tft.width()/2, 15);
-        tft.drawString("Last Synced Time:", tft.width()/2, 20);
+        tft.drawString("Last Synced Time:", tft.width()/2, 25);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
         const char* weekDayStr[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 

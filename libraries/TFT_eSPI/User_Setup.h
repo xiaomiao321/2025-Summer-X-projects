@@ -19,3 +19,4 @@
 #define LOAD_GFXFF // FreeFonts. Include access to the 48 Adafruit_GFX free fonts FF1 to FF48 and custom fonts
 //#define LOAD_GFX_FREE_SANS_9PT7B // Load the 9pt7b font from the GFX free fonts
 #define SPI_FREQUENCY 27000000
+#define TFT_SDA_READ  
