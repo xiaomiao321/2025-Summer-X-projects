@@ -13,6 +13,7 @@
 #include "ADC.h"
 #include "Watchface.h" // <-- ADDED
 #include "MQTT.h"
+#include "MusicMenuLite.h"
 // --- Layout Configuration ---
 // Change these values to adjust the menu layout
 static const int ICON_SIZE = 200;     // The size for the icons (e.g., 180x180)
@@ -42,6 +43,7 @@ const MenuItem menuItems[] = {
     {"Pomodoro", tomato, &PomodoroMenu},
     {"Stopwatch", Timer, &StopwatchMenu},
     {"Music", Music, &BuzzerMenu},
+    {"Music Lite", Music, &MusicMenuLite},
     {"Performance", Performance, &performanceMenu},
     {"Temperature",Temperature, &DS18B20Menu},
     {"Animation",LED, &AnimationMenu},

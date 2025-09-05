@@ -4,6 +4,13 @@
 #define BUZZER_PIN 5
 
 #include <Arduino.h>
+
+// 播放模式枚举
+enum PlayMode {
+  SINGLE_LOOP,   // 单曲循环
+  LIST_LOOP,     // 列表播放
+  RANDOM_PLAY    // 随机播放
+};
 #include <TFT_eSPI.h>
 #include "Music_processed/cai_bu_tou.h"
 #include "Music_processed/cheng_du.h"
@@ -18,7 +25,6 @@
 #include "Music_processed/chun_jiao_yu_zhi_ming.h"
 #include "Music_processed/Windows.h"
 #include "Music_processed/mi_ren_de_wei_xian.h"
-#define BUZZER_PIN 5
 
 // 音阶频率（Hz）
 #define NOTE_REST 0

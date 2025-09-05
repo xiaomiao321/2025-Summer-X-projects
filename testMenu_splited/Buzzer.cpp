@@ -13,6 +13,8 @@
 
 TaskHandle_t buzzerTaskHandle = NULL;
 TaskHandle_t ledTaskHandle = NULL;
+
+PlayMode currentPlayMode = LIST_LOOP; // 默认列表播放
 // FFT Constants
 #define SAMPLES 256
 #define SAMPLING_FREQUENCY 4000
@@ -24,14 +26,7 @@ double vReal[SAMPLES];
 double vImag[SAMPLES];
 double spectrum[NUM_BANDS];
 
-// 播放模式枚举
-enum PlayMode {
-  SINGLE_LOOP,   // 单曲循环
-  LIST_LOOP,     // 列表播放
-  RANDOM_PLAY    // 随机播放
-};
 
-PlayMode currentPlayMode = LIST_LOOP; // 默认列表播放
 
 const Song songs[] PROGMEM= {
   { "Cai Bu Tou", melody_cai_bu_tou, durations_cai_bu_tou, sizeof(melody_cai_bu_tou) / sizeof(melody_cai_bu_tou[0]), 0 },
