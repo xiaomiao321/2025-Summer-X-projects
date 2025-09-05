@@ -120,7 +120,7 @@ void CountdownMenu() {
             exitSubMenu = false;
             return;
         }
-        if (g_alarm_is_ringing) { return; } // ADDED LINE
+        if (g_alarm_is_ringing) { return; } 
         if (readButtonLongPress()) {
             tone(BUZZER_PIN, 1500, 100);
             return;

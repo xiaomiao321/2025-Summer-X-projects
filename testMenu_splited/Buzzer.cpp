@@ -8,6 +8,7 @@
 #include "Menu.h"
 #include "MQTT.h"
 #include "weather.h"
+#include "Alarm.h"
 // FFT Constants
 #define SAMPLES 256
 #define SAMPLING_FREQUENCY 4000
@@ -28,7 +29,6 @@ enum PlayMode {
 
 PlayMode currentPlayMode = LIST_LOOP; // 默认列表播放
 
-// 0-4
 const Song songs[] PROGMEM= {
   { "Cai Bu Tou", melody_cai_bu_tou, durations_cai_bu_tou, sizeof(melody_cai_bu_tou) / sizeof(melody_cai_bu_tou[0]), 0 },
   {"Chun Jiao Yu Zhi Ming",melody_chun_jiao_yu_zhi_ming,durations_chun_jiao_yu_zhi_ming,sizeof(melody_chun_jiao_yu_zhi_ming)/sizeof(melody_chun_jiao_yu_zhi_ming[0]),1},
@@ -118,16 +118,16 @@ float calculateSongDuration(const Song* song) {
 // 显示歌曲选择列表
 void displaySongList(int selectedIndex) {
   // 始终使用黑色背景
-  tft.fillScreen(TFT_BLACK);
+  menuSprite.fillScreen(TFT_BLACK);
   
   // 绘制标题
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.setTextSize(2);
-  tft.setTextDatum(MC_DATUM);
-  tft.drawString("Music Menu", 120, 28);
+  menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+  menuSprite.setTextSize(2);
+  menuSprite.setTextDatum(MC_DATUM);
+  menuSprite.drawString("Music Menu", 120, 28);
   
   // 绘制歌曲列表
-  tft.setTextWrap(true);
+  menuSprite.setTextWrap(true);
   for (int i = 0; i < visibleSongs; i++) {
     int songIdx = displayOffset + i;
     if (songIdx >= numSongs) break;
@@ -137,27 +137,28 @@ void displaySongList(int selectedIndex) {
     // 选中的歌曲高亮显示
     if (songIdx == selectedIndex) {
       // 深蓝色背景
-      tft.fillRoundRect(10, yPos - 18, 220, 36, 5, 0x001F); // 0x001F is a deep blue color
+      menuSprite.fillRoundRect(10, yPos - 18, 220, 36, 5, 0x001F); 
       
       // 歌曲名称 - 白色文字
-      tft.setTextSize(2);
-      tft.setTextColor(TFT_WHITE, 0x001F);
-      tft.setTextDatum(MC_DATUM);
-      tft.drawString(songs[songIdx].name, 120, yPos);
+      menuSprite.setTextSize(2);
+      menuSprite.setTextColor(TFT_WHITE, 0x001F);
+      menuSprite.setTextDatum(MC_DATUM);
+      menuSprite.drawString(songs[songIdx].name, 120, yPos);
     } else {
       // 未选中的歌曲 - 黑色背景
-      tft.fillRoundRect(10, yPos - 18, 220, 36, 5, TFT_BLACK);
+      menuSprite.fillRoundRect(10, yPos - 18, 220, 36, 5, TFT_BLACK);
       
       // 歌曲名称 - 白色文字
-      tft.setTextSize(1);
-      tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.setTextDatum(MC_DATUM);
-      tft.drawString(songs[songIdx].name, 120, yPos);
+      menuSprite.setTextSize(1);
+      menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+      menuSprite.setTextDatum(MC_DATUM);
+      menuSprite.drawString(songs[songIdx].name, 120, yPos);
     }
   }
   
   // 重置文本对齐方式
-  tft.setTextDatum(TL_DATUM);
+  menuSprite.setTextDatum(TL_DATUM);
+  menuSprite.pushSprite(0, 0);
 }
 
 // Helper function to interpolate 565 colors
@@ -185,104 +186,124 @@ void formatTime(char* buf, int totalSeconds) {
 }
 
 // 显示播放界面
-void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int currentNote, float elapsedTime) {
+void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int currentNote, int noteDuration, float elapsedTime) {
     static PlayMode lastPlayMode = (PlayMode)-1;
     static char lastTimeStr[20] = "";
     static int lastNoteIndex = -1;
     static float lastElapsedTime = -1.0;
+    static int lastNoteDuration = -1; // Track last note duration for clearing
+    static int lastCurrentNote = -1; // Track last current note for clearing
 
     if (firstDraw) {
-        tft.fillScreen(TFT_BLACK);
+        menuSprite.fillScreen(TFT_BLACK);
         
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextSize(3); // Changed to size 3
-        tft.setTextDatum(MC_DATUM);
-        tft.drawString(songs[songIndex].name, 120, 30);
-        tft.setTextDatum(TL_DATUM);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextSize(2);
+        menuSprite.setTextDatum(MC_DATUM);
+        menuSprite.drawString(songs[songIndex].name, 120, 30); // Song Name
+        menuSprite.setTextDatum(TL_DATUM);
 
-        // Draw progress bar background and time labels
-        tft.fillRoundRect(10, 130, 220, 10, 5, TFT_DARKGREY);
-        char totalTimeStr[6];
-        formatTime(totalTimeStr, (int)calculateSongDuration(&songs[songIndex]));
-        tft.setTextSize(1);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.drawString(totalTimeStr, 200, 115); // Total time
-        char elapsedTimeStr[6];
-        formatTime(elapsedTimeStr, 0);
-        tft.drawString(elapsedTimeStr, 20, 115); // Initial elapsed time
-
-        // Add note count display
-        char noteCountStr[20];
-        sprintf(noteCountStr, "%d / %d", 1, songs[songIndex].length); // Initial note count is 1
-        tft.setTextDatum(MC_DATUM); // Temporarily set datum to center for this string
-        tft.drawString(noteCountStr, 120, 115); // Centered above progress bar
-        tft.setTextDatum(TL_DATUM); // Reset datum
-
+        // Initial draw for note time/freq, play mode, clock time, etc.
+        // These will be updated in their respective blocks below.
         firstDraw = false;
         lastPlayMode = (PlayMode)-1;
         strcpy(lastTimeStr, "");
         lastNoteIndex = -1;
         lastElapsedTime = -1.0;
+        lastNoteDuration = -1;
+        lastCurrentNote = -1;
     }
 
-    if(lastPlayMode != currentPlayMode){
-        // Clear a larger area for centered text with size 2
-        tft.fillRect(0, 55, 240, 30, TFT_BLACK); // Clear from x=0, y=55, width=240, height=30
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextSize(2); // Set font size to 2
-        tft.setTextDatum(MC_DATUM); // Set datum to Middle-Center
-        switch (currentPlayMode) {
-            case SINGLE_LOOP: tft.drawString("Single Loop", 120, 70); break; // Centered at x=120, y=70
-            case LIST_LOOP: tft.drawString("List Loop", 120, 70); break;
-            case RANDOM_PLAY: tft.drawString("Random", 120, 70); break;
+    // --- Display Current Note Time and Frequency ---
+    // Only update if note or duration changes, or if it's the first draw
+    if (noteDuration != lastNoteDuration || currentNote != lastCurrentNote || firstDraw) {
+        menuSprite.fillRect(0, 45, 240, 30, TFT_BLACK); // Clear area for note info
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextSize(2); // Smaller size for note info
+        menuSprite.setTextDatum(MC_DATUM);
+        if (noteDuration > 0) { // Only display if a note is playing
+            char noteInfoStr[50];
+            sprintf(noteInfoStr, "%d Hz  %d ms", currentNote, noteDuration);
+            menuSprite.drawString(noteInfoStr, 120, 57); 
+        } else {
+            menuSprite.drawString("Paused", 120, 55); // Display "Paused" when noteDuration is 0
         }
-        tft.setTextDatum(TL_DATUM); // Reset datum to Top-Left
+        menuSprite.setTextDatum(TL_DATUM);
+        lastNoteDuration = noteDuration;
+        lastCurrentNote = currentNote;
+    }
+
+    // --- Play Mode Update ---
+    if(lastPlayMode != currentPlayMode){
+        menuSprite.fillRect(0, 75, 240, 30, TFT_BLACK); // Clear area for play mode (moved down)
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextSize(2);
+        menuSprite.setTextDatum(MC_DATUM);
+        switch (currentPlayMode) {
+            case SINGLE_LOOP: menuSprite.drawString("Single Loop", 120, 85); break; // Moved to y=85
+            case LIST_LOOP: menuSprite.drawString("List Loop", 120, 85); break;
+            case RANDOM_PLAY: menuSprite.drawString("Random", 120, 85); break;
+        }
+        menuSprite.setTextDatum(TL_DATUM);
         lastPlayMode = currentPlayMode;
     }
 
+    // --- Current Clock Time Update ---
     if (!getLocalTime(&timeinfo)) { return; }
     char timeStr[20];
     strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
     if (strcmp(timeStr, lastTimeStr) != 0) {
-        // Clear a larger area for centered text with size 2
-        tft.fillRect(0, 85, 240, 30, TFT_BLACK); // Clear from x=0, y=85, width=240, height=30
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextSize(2); // Set font size to 2
-        tft.setTextDatum(MC_DATUM); // Set datum to Middle-Center
-        tft.drawString(timeStr, 120, 100); // Centered at x=120, y=100
-        tft.setTextDatum(TL_DATUM); // Reset datum to Top-Left
+        menuSprite.fillRect(0, 105, 240, 30, TFT_BLACK); // Clear area for clock time (moved down)
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextSize(2);
+        menuSprite.setTextDatum(MC_DATUM);
+        menuSprite.drawString(timeStr, 120, 115); // Moved to y=115
+        menuSprite.setTextDatum(TL_DATUM);
         strcpy(lastTimeStr, timeStr);
     }
 
-    if (noteIndex != lastNoteIndex) {
-        int progressWidth = (noteIndex + 1) * 220 / totalNotes; // Changed 200 to 220
-        tft.fillRoundRect(10, 130, progressWidth, 10, 5, TFT_WHITE); // Changed x from 20 to 10
+    // --- Note Count and Elapsed/Total Time Update ---
+    // Only update if noteIndex or elapsedTime changes
+    if (noteIndex != lastNoteIndex || (int)elapsedTime != (int)lastElapsedTime) {
+        // Clear previous time and note count area
+        menuSprite.fillRect(0, 130, 240, 20, TFT_BLACK); // Clear area for time/note count (moved down)
 
-        // Update note count display
-        tft.fillRect(120, 115, 60, 12, TFT_BLACK); // Clear previous note count area
+        char totalTimeStr[6];
+        formatTime(totalTimeStr, (int)calculateSongDuration(&songs[songIndex]));
+        char elapsedTimeStr[6];
+        formatTime(elapsedTimeStr, (int)elapsedTime);
+
+        menuSprite.setTextSize(2); // Changed to size 2
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextDatum(TL_DATUM);
+        menuSprite.drawString(elapsedTimeStr, 10, 140); // Moved to y=140
+        menuSprite.setTextDatum(TR_DATUM); // Align total time to right
+        menuSprite.drawString(totalTimeStr, 230, 140); // Moved to y=140
+        menuSprite.setTextDatum(TL_DATUM); // Reset datum
+
         char noteCountStr[20];
-        sprintf(noteCountStr, "%d / %d", noteIndex + 1, totalNotes);
-        tft.setTextSize(1);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextDatum(MC_DATUM); // Temporarily set datum to center for this string
-        tft.drawString(noteCountStr, 120, 115); // Centered above progress bar
-        tft.setTextDatum(TL_DATUM); // Reset datum
+        sprintf(noteCountStr, "%d/%d", noteIndex + 1, totalNotes);
+        menuSprite.setTextSize(2); // Changed to size 2
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextDatum(MC_DATUM);
+        // menuSprite.drawString(noteCountStr, 120, 140); // Centered at y=140
+        menuSprite.setTextDatum(TL_DATUM); // Reset datum
         
-        if ((int)elapsedTime != (int)lastElapsedTime) {
-            char elapsedTimeStr[6];
-            formatTime(elapsedTimeStr, (int)elapsedTime);
-            tft.fillRect(20, 115, 40, 12, TFT_BLACK); // Clear previous time
-            tft.drawString(elapsedTimeStr, 20, 115);
-            lastElapsedTime = elapsedTime;
-        }
+        lastElapsedTime = elapsedTime;
         lastNoteIndex = noteIndex;
     }
 
-    // Spectrum analyzer
-    tft.fillRect(5, 165, 230, 70, TFT_BLACK); // Clear previous spectrum
+    // --- Progress Bar ---
+    // Always redraw to ensure smooth update
+    menuSprite.fillRect(10, 155, 220, 10, TFT_BLACK); // Clear previous progress bar (moved down)
+    int progressWidth = (noteIndex + 1) * 220 / totalNotes;
+    menuSprite.fillRoundRect(10, 155, progressWidth, 10, 5, TFT_WHITE); // Moved to y=155
+
+    // --- Spectrum analyzer ---
+    menuSprite.fillRect(5, 180, 230, 70, TFT_BLACK); // Clear previous spectrum (moved down)
     int barWidth = 8;
     int barSpacing = 14;
-    uint16_t deepBlue = TFT_CYAN;
+    // uint16_t deepBlue = TFT_CYAN; // Unused variable
     for (int i = 0; i < NUM_BANDS; i++) {
         int barHeight = spectrum[i] * 100;
         if (barHeight > 70) barHeight = 70;
@@ -290,9 +311,10 @@ void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int curren
 
         if(barHeight > 0) {
             uint16_t barColor = TFT_CYAN;
-            tft.fillRoundRect(10 + i * barSpacing, 235 - barHeight, barWidth, barHeight, 4, barColor);
+            menuSprite.fillRoundRect(10 + i * barSpacing, 250 - barHeight, barWidth, barHeight, 4, barColor);
         }
     }
+    menuSprite.pushSprite(0, 0);
 }
 
 // 蜂鸣器初始化
@@ -311,9 +333,8 @@ void Led_Task(void *pvParameters) {
     if (stopLedTask) {
       strip.clear();
       strip.show();
-      vTaskDelete(NULL);
-      stopLedTask = false; // 重置标志
-      vTaskDelete(NULL);
+      stopLedTask = false; // Reset flag
+      vTaskDelete(NULL); // Self-delete
     }
 
     if (currentLedCommand.effectType != 0 && currentEffect == 0) {
@@ -366,6 +387,8 @@ void Buzzer_Task(void *pvParameters) {
   Song song;
   memcpy_P(&song, &songs[songIndex], sizeof(Song));
   static int currentNoteIndex = 0; // Track current note index
+  static int lastDisplayedNoteIndex = 0; // Added for pause display
+  static float lastDisplayedElapsedTime = 0.0; // Added for pause display
 
   for (;;) {
     if (stopBuzzerTask) {
@@ -375,14 +398,16 @@ void Buzzer_Task(void *pvParameters) {
       Serial.println("Buzzer_Task 被外部中断，已停止");
       firstDraw = true;
       currentNoteIndex = 0; // Reset note index
-      break;
+      lastDisplayedNoteIndex = 0; // Reset on exit
+      lastDisplayedElapsedTime = 0.0; // Reset on exit
+      vTaskDelay(pdMS_TO_TICKS(50)); // Small delay before deleting
+      vTaskDelete(NULL); // Self-delete
     }
 
     // Pause/Resume logic
     if (isPaused) {
       noTone(BUZZER_PIN); // Ensure buzzer is off during pause
-      vTaskDelay(pdMS_TO_TICKS(10));
-      continue;
+      // Removed vTaskDelay and continue, handled by the while(isPaused) loop below
     }
 
     for (int i = currentNoteIndex; i < song.length; i++) {
@@ -398,6 +423,17 @@ void Buzzer_Task(void *pvParameters) {
 // If paused, wait here without advancing the note index
       while (isPaused) {
         noTone(BUZZER_PIN); // Ensure buzzer is off during pause
+        if (stopBuzzerTask) {
+            noTone(BUZZER_PIN);
+            strip.clear();
+            strip.show();
+            firstDraw = true;
+            currentNoteIndex = 0; // Reset note index
+            lastDisplayedNoteIndex = 0; // Reset on exit
+            lastDisplayedElapsedTime = 0.0; // Reset on exit
+            goto exit_loop;
+        }
+        displayPlayingSong(songIndex, lastDisplayedNoteIndex, song.length, 0, 0, lastDisplayedElapsedTime); // Update display (0 for noteDuration when paused)
         vTaskDelay(pdMS_TO_TICKS(50)); // Wait before checking again
       }
 
@@ -436,8 +472,35 @@ void Buzzer_Task(void *pvParameters) {
       }
       elapsedTime /= 1000.0; // convert to seconds
 
-      displayPlayingSong(songIndex, i, song.length, note, elapsedTime);
-      vTaskDelay(pdMS_TO_TICKS(duration));
+      // displayPlayingSong(songIndex, i, song.length, note, elapsedTime); // Initial call removed
+      
+      unsigned long noteStartTime = millis();
+      while (millis() - noteStartTime < duration) {
+        if (stopBuzzerTask) {
+          noTone(BUZZER_PIN);
+          strip.clear();
+          strip.show();
+          firstDraw = true;
+          currentNoteIndex = 0; // Reset note index
+          lastDisplayedNoteIndex = 0; // Reset on exit
+          lastDisplayedElapsedTime = 0.0; // Reset on exit
+          goto exit_loop;
+        }
+        // Recalculate elapsedTime for song progress
+        float currentElapsedTime = 0;
+        for (int j = 0; j < i; j++) { // Sum durations of notes already played
+            currentElapsedTime += pgm_read_word(song.durations+j);
+        }
+        currentElapsedTime += (millis() - noteStartTime); // Add elapsed time of current note
+        currentElapsedTime /= 1000.0; // convert to seconds
+
+        lastDisplayedNoteIndex = i; // Update last displayed values
+        lastDisplayedElapsedTime = currentElapsedTime;
+
+        displayPlayingSong(songIndex, i, song.length, note, duration, currentElapsedTime); // Call periodically
+        vTaskDelay(pdMS_TO_TICKS(10));
+      }
+
       noTone(BUZZER_PIN);
       currentNoteIndex = i + 1; // Update note index after playing
     }
@@ -494,7 +557,20 @@ void Buzzer_PlayMusic_Task(void *pvParameters) {
     currentLedCommand.color = mapFrequencyToColor(note);
     currentLedCommand.frequency = note;
 
-    vTaskDelay(pdMS_TO_TICKS(duration));
+    unsigned long noteStartTime = millis();
+    while(millis() - noteStartTime < duration)
+    {
+      if (stopBuzzerTask) {
+        noTone(BUZZER_PIN);
+        strip.clear();
+        strip.show();
+        stopBuzzerTask = false;
+        Serial.println("Buzzer_PlayMusic_Task stopped by flag.");
+        vTaskDelete(NULL);
+        return;
+      }
+      vTaskDelay(pdMS_TO_TICKS(10));
+    }
     
     noTone(BUZZER_PIN); // Ensure tone is off before next note
   }
@@ -536,19 +612,20 @@ void BuzzerMenu() {
   firstDraw = true;
   isPaused = false;
 
-  detectDoubleClick(true); // Reset double click state on entry
+  // detectDoubleClick(true); // Reset double click state on entry
 
   // 歌曲选择循环
 select_song:
   displaySongList(selectedSongIndex);
 
   while (1) {
-    if (exitSubMenu) {
+    if (exitSubMenu || g_alarm_is_ringing) {
         exitSubMenu = false;
         stopLedTask = true;
+        menuSprite.fillScreen(TFT_BLACK);
+        menuSprite.pushSprite(0, 0);
         return;
     }
-    
     int encoderChange = readEncoder();
     if (encoderChange != 0) {
       selectedSongIndex = (selectedSongIndex + encoderChange + numSongs) % numSongs;
@@ -563,20 +640,27 @@ select_song:
     }
     
     if (readButton()) {
-      if (detectDoubleClick()) { // 双击返回主菜单
-        Serial.println("双击检测到，返回主菜单");
-        stopLedTask = true; // Signal Led_Task to stop
-        TaskHandle_t taskHandle = xTaskGetHandle("Led_Task");
-        if (taskHandle != NULL) {
-          vTaskDelete(taskHandle); // Delete Led_Task
-        }
-        showMenuConfig();
-        return;
-      }
+      // if (detectDoubleClick()) { // 双击返回主菜单
+      //   Serial.println("双击检测到，返回主菜单");
+      //   stopLedTask = true; // Signal Led_Task to stop
+      //   TaskHandle_t taskHandle = xTaskGetHandle("Led_Task");
+      //   if (taskHandle != NULL) {
+      //     vTaskDelete(taskHandle); // Delete Led_Task
+      //   }
+      //   showMenuConfig();
+      //   return;
+      // }
       Serial.printf("确认播放歌曲：%s\n", songs[selectedSongIndex].name);
       firstDraw = true;
       break;
     }
+    if (readButtonLongPress()) {
+      stopLedTask = true;
+      // Led_Task will self-delete
+      menuSprite.fillScreen(TFT_BLACK);
+      menuSprite.pushSprite(0, 0);
+      return;
+  }
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 
@@ -586,11 +670,25 @@ select_song:
 
   // 播放控制循环
   while (1) {
-    if (exitSubMenu) {
+    if (exitSubMenu || g_alarm_is_ringing) {
         exitSubMenu = false;
         stopBuzzerTask = true;
         stopLedTask = true;
-        vTaskDelay(pdMS_TO_TICKS(150)); 
+        vTaskDelay(pdMS_TO_TICKS(150)); // Give tasks time to stop
+        TaskHandle_t buzzerTaskHandle = xTaskGetHandle("Buzzer_Task"); // Wait for Buzzer_Task
+        if (buzzerTaskHandle != NULL) {
+          const TickType_t xTimeout = pdMS_TO_TICKS(100);
+          while (eTaskGetState(buzzerTaskHandle) != eDeleted && xTimeout > 0) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+          }
+        }
+        TaskHandle_t ledTaskHandle = xTaskGetHandle("Led_Task"); // Wait for Led_Task
+        if (ledTaskHandle != NULL) {
+          const TickType_t xTimeout = pdMS_TO_TICKS(100);
+          while (eTaskGetState(ledTaskHandle) != eDeleted && xTimeout > 0) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+          }
+        }
         return;
     }
 
@@ -609,11 +707,8 @@ select_song:
         case RANDOM_PLAY: Serial.println("随机播放"); break;
       }
     }
-
-    // 按钮：单击暂停/播放，双击返回歌曲选择
-    if (readButton()) {
-      if (detectDoubleClick()) {
-        Serial.println("双击检测到，返回主菜单");
+    if(readButtonLongPress())
+    {
         stopBuzzerTask = true;
         stopLedTask = true; // Signal Led_Task to stop
         TaskHandle_t buzzerTaskHandle = xTaskGetHandle("Buzzer_Task");
@@ -623,16 +718,36 @@ select_song:
             vTaskDelay(pdMS_TO_TICKS(10));
           }
         }
-        TaskHandle_t ledTaskHandle = xTaskGetHandle("Led_Task");
+        TaskHandle_t ledTaskHandle = xTaskGetHandle("Led_Task"); // Get handle for Led_Task
         if (ledTaskHandle != NULL) {
-          vTaskDelete(ledTaskHandle); // Delete Led_Task
+          const TickType_t xTimeout = pdMS_TO_TICKS(100); // Use same timeout
+          while (eTaskGetState(ledTaskHandle) != eDeleted && xTimeout > 0) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+          }
         }
-        
-        // display = 48;
-        // picture_flag = 0;
-        // showMenuConfig();
+        // Led_Task will self-delete
         return;
-      } else {
+    }
+    // 按钮：单击暂停/播放，双击返回歌曲选择
+    if (readButton()) {
+      // if (detectDoubleClick()) {
+      //   Serial.println("双击检测到，返回主菜单");
+      //   stopBuzzerTask = true;
+      //   stopLedTask = true; // Signal Led_Task to stop
+      //   TaskHandle_t buzzerTaskHandle = xTaskGetHandle("Buzzer_Task");
+      //   if (buzzerTaskHandle != NULL) {
+      //     const TickType_t xTimeout = pdMS_TO_TICKS(100);
+      //     while (eTaskGetState(buzzerTaskHandle) != eDeleted && xTimeout > 0) {
+      //       vTaskDelay(pdMS_TO_TICKS(10));
+      //     }
+      //   }
+      //   TaskHandle_t ledTaskHandle = xTaskGetHandle("Led_Task");
+      //   if (ledTaskHandle != NULL) {
+      //     vTaskDelete(ledTaskHandle); // Delete Led_Task
+      //   }
+        
+      //   return;
+      // } else {
         isPaused = !isPaused;
         if (isPaused) {
           Serial.println("音乐暂停");
@@ -643,7 +758,6 @@ select_song:
           Serial.println("音乐继续");
         }
         tone(BUZZER_PIN, 1000, 50);
-      }
     }
     vTaskDelay(pdMS_TO_TICKS(10));
   }
