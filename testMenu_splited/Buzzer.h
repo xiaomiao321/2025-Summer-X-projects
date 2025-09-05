@@ -96,8 +96,9 @@ typedef struct {
 // Exposed for watchface hourly chime
 extern const Song songs[] PROGMEM;
 extern const int numSongs;
-extern bool stopBuzzerTask;
+extern volatile bool stopBuzzerTask;
 void Buzzer_Task(void *pvParameters);
+void Buzzer_PlayMusic_Task(void *pvParameters);
 void Buzzer_PlayMusic_Task(void *pvParameters);
 
 // Main menu function

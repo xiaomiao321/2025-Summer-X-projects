@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
+#include <AsyncUDP.h>
 #include <Preferences.h>
 #include "Menu.h" // For using the menuSprite for display
 #include "System.h" // For tftLog
