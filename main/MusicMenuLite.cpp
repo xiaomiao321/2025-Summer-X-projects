@@ -109,6 +109,9 @@ void MusicLite_Playback_Task(void *pvParameters) {
         shared_current_note_duration = 0;
         shared_current_note_frequency = 0;
 
+        // Pause for 2 seconds before playing the next song
+        vTaskDelay(pdMS_TO_TICKS(2000));
+
         // Song finished, select next one based on play mode
         if (shared_play_mode == SINGLE_LOOP) {
             // Just repeat the same song index
@@ -228,6 +231,13 @@ void displayPlayingScreen_Lite(uint16_t progress_bar_color) {
              total_sec / 60, total_sec % 60);
     menuSprite.setTextSize(2);
     menuSprite.drawString(time_buf, 120, 190);
+
+    // Note Count Display
+    char note_count_buf[20];
+    snprintf(note_count_buf, sizeof(note_count_buf), "%d / %d",
+             shared_note_index + 1, shared_total_notes); // +1 because shared_note_index is 0-based
+    menuSprite.setTextSize(2);
+    menuSprite.drawString(note_count_buf, 120, 210);
 
     menuSprite.pushSprite(0, 0);
 }
