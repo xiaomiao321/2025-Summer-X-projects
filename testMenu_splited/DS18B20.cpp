@@ -7,7 +7,7 @@
 #include "Menu.h"
 #include "RotaryEncoder.h"
 #include "Alarm.h"
-
+#include "weather.h"
 // Graph dimensions and position
 #define TEMP_GRAPH_WIDTH  200
 #define TEMP_GRAPH_HEIGHT 135
@@ -101,12 +101,41 @@ void DS18B20_Task(void *pvParameters) {
 
     if (tempC != DEVICE_DISCONNECTED_C && tempC > -50 && tempC < 150) {
       tft.fillRect(0, 0, tft.width(), TEMP_GRAPH_Y - 5, TFT_BLACK); // Clear area above graph
+      
+      // Display current time at the top
+      if (!getLocalTime(&timeinfo)) {
+          // Handle error or display placeholder
+      } else {
+          char time_str[30]; // Increased buffer size
+          strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S %a", &timeinfo); // New format
+          tft.setTextFont(2); // Smaller font for time
+          tft.setTextSize(1);
+          tft.setTextColor(TFT_WHITE, TFT_BLACK);
+          tft.setTextDatum(MC_DATUM); // Center align
+          tft.drawString(time_str, tft.width() / 2, 10); // Position at top center
+          tft.setTextDatum(TL_DATUM); // Reset datum
+      }
+
       char tempStr[10];
       dtostrf(tempC, 4, 2, tempStr);
-      tft.setTextSize(4);
-      tft.setCursor(TEMP_VALUE_X, TEMP_VALUE_Y);
-      tft.print(tempStr);
-      tft.print(" C");
+      
+      tft.setTextFont(7); // Set font to 7
+      tft.setTextSize(1); // Set size to 1
+
+      // Calculate position to center the text
+      // Need to combine tempStr and " C" for accurate width calculation
+      char fullTempStr[15];
+      sprintf(fullTempStr, "%s C", tempStr);
+
+      int text_width = tft.textWidth(fullTempStr);
+      int text_height = tft.fontHeight();
+      int x_pos = (tft.width() - text_width) / 2;
+      // Adjust y_pos to account for the time display at the top
+      int y_pos = (TEMP_GRAPH_Y - 5 - text_height) / 2 + 20; // Shift down by ~20 pixels for time
+
+      tft.setTextDatum(TL_DATUM); // Set to Top-Left for precise positioning
+      tft.setTextColor(TFT_WHITE, TFT_BLACK); // Ensure text color is white on black background
+      tft.drawString(fullTempStr, x_pos, y_pos);
 
       tr.addPoint(gx, tempC - 0.5);
       tr.addPoint(gx, tempC);

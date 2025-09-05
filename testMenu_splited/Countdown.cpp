@@ -4,6 +4,7 @@
 #include "Buzzer.h"
 #include "RotaryEncoder.h"
 #include "Alarm.h"
+#include "weather.h"
 // --- State Variables ---
 static unsigned long countdown_target_millis = 0;
 static unsigned long countdown_start_millis = 0;
@@ -21,6 +22,23 @@ static CountdownSettingMode countdown_setting_mode = MODE_MINUTES;
 void displayCountdownTime(unsigned long millis_left) {
     menuSprite.fillScreen(TFT_BLACK);
     menuSprite.setTextDatum(TL_DATUM);
+
+    // Display current time at the top
+    // timeinfo is a global variable declared in weather.h
+    if (!getLocalTime(&timeinfo)) {
+        // Handle error or display placeholder
+    } else {
+        char time_str[30]; // Increased buffer size
+        strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S %a", &timeinfo); // New format
+        menuSprite.setTextFont(2); // Smaller font for time
+        menuSprite.setTextSize(1);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextDatum(MC_DATUM); // Center align
+        menuSprite.drawString(time_str, menuSprite.width() / 2, 10); // Position at top center
+        menuSprite.setTextDatum(TL_DATUM); // Reset datum
+    }
+
+    
 
     // --- Time Calculation ---
     unsigned long total_seconds = millis_left / 1000;
@@ -190,6 +208,7 @@ void CountdownMenu() {
             long millis_left = countdown_target_millis - current_millis;
             if (millis_left < 0) millis_left = 0;
 
+            // Update countdown display frequently
             if (millis_left / 100 != (countdown_target_millis - last_display_update_time) / 100) {
                 displayCountdownTime(millis_left);
                 last_display_update_time = current_millis;
@@ -206,6 +225,12 @@ void CountdownMenu() {
                 countdown_paused = false;
                 tone(BUZZER_PIN, 3000, 3000); // Final alarm sound
                 displayCountdownTime(0);
+            }
+        } else { // If countdown is not running (paused or setting time), update real-time clock
+            unsigned long current_millis = millis();
+            if (current_millis - last_display_update_time >= 1000) { // Update every second
+                displayCountdownTime(countdown_duration_seconds * 1000); // Pass current countdown value (won't change)
+                last_display_update_time = current_millis;
             }
         }
 

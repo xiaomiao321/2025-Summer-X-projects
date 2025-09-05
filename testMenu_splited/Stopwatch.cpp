@@ -4,7 +4,7 @@
 #include "Buzzer.h"
 #include "Alarm.h"
 #include "RotaryEncoder.h"
-
+#include "weather.h"
 #define LONG_PRESS_DURATION 1500 // milliseconds for long press to exit
 
 // Global variables for stopwatch state
@@ -18,6 +18,20 @@ static unsigned long stopwatch_pause_time = 0;
 void displayStopwatchTime(unsigned long elapsed_millis) {
     menuSprite.fillScreen(TFT_BLACK);
     menuSprite.setTextDatum(TL_DATUM); // Use Top-Left for precise positioning
+
+    // Display current time at the top
+    if (!getLocalTime(&timeinfo)) {
+        // Handle error or display placeholder
+    } else {
+        char time_str[30]; // Increased buffer size
+        strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S %a", &timeinfo); // New format
+        menuSprite.setTextFont(2); // Smaller font for time
+        menuSprite.setTextSize(1);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextDatum(MC_DATUM); // Center align
+        menuSprite.drawString(time_str, menuSprite.width() / 2, 10); // Position at top center
+        menuSprite.setTextDatum(TL_DATUM); // Reset datum
+    }
 
     // Time calculation
     unsigned long total_seconds = elapsed_millis / 1000;
@@ -88,60 +102,66 @@ void StopwatchMenu() {
     stopwatch_elapsed_time = 0;
     stopwatch_running = false;
     stopwatch_pause_time = 0;
-    displayStopwatchTime(0);
-
-    bool button_pressed = false;
-    unsigned long last_display_update_time = millis();
-
+    displayStopwatchTime(0); // Initial display
+    static unsigned long last_displayed_stopwatch_millis = 0; // Track last displayed value for smooth updates
+    unsigned long last_realtime_clock_update = millis(); // For real-time clock update
 
     while (true) {
         if (exitSubMenu) {
             exitSubMenu = false; // Reset flag
             return; // Exit the StopwatchMenu function
         }
-        if (g_alarm_is_ringing) { return; } // ADDED LINE
-        button_pressed = readButton();
+        if (g_alarm_is_ringing) { return; }
 
-        // Button press handling
-        if (button_pressed) {
+        // Handle long press for reset and exit
+        if (readButtonLongPress()) {
+            tone(BUZZER_PIN, 1500, 100); // Exit sound
+            // Reset stopwatch state
+            stopwatch_start_time = 0;
+            stopwatch_elapsed_time = 0;
+            stopwatch_running = false;
+            stopwatch_pause_time = 0;
+            last_displayed_stopwatch_millis = 0; // Reset this as well
+            return; // Exit the StopwatchMenu function
+        }
+
+        // Handle single click for start/pause
+        if (readButton()) {
             tone(BUZZER_PIN, 2000, 50); // Confirm sound
-            if (!stopwatch_running && stopwatch_elapsed_time == 0) { // Start
-                stopwatch_start_time = millis();
-                stopwatch_running = true;
-            } else if (stopwatch_running) { // Stop/Pause
+            if (stopwatch_running) { // Currently running, so pause
                 stopwatch_elapsed_time += (millis() - stopwatch_start_time);
                 stopwatch_running = false;
-            } else if (!stopwatch_running && stopwatch_elapsed_time > 0) { // Reset or Resume
-                // If already stopped, a press resets it
-                // If paused, a press resumes it
-                if (stopwatch_elapsed_time > 0 && (millis() - stopwatch_pause_time) > 500) { // Simple debounce for reset
-                    // If button pressed again after a short pause, it's a reset
-                    stopwatch_start_time = 0;
-                    stopwatch_elapsed_time = 0;
-                    stopwatch_running = false;
-                    displayStopwatchTime(0);
-                } else { // Resume
-                    stopwatch_start_time = millis() - stopwatch_elapsed_time; // Adjust start time
-                    stopwatch_running = true;
-                }
+            } else { // Currently paused or stopped, so start/resume
+                stopwatch_start_time = millis(); // Adjust start time for resume
+                stopwatch_running = true;
             }
-            stopwatch_pause_time = millis(); // Record time of last button press
-            displayStopwatchTime(stopwatch_elapsed_time); // Update display immediately
+            // IMMEDIATE DISPLAY UPDATE AFTER STATE CHANGE
+            unsigned long current_display_value;
+            if (stopwatch_running) {
+                current_display_value = stopwatch_elapsed_time + (millis() - stopwatch_start_time);
+            } else {
+                current_display_value = stopwatch_elapsed_time;
+            }
+            displayStopwatchTime(current_display_value);
+            last_displayed_stopwatch_millis = current_display_value; // Update this immediately
         }
 
-        // Update stopwatch if running
+        // Update stopwatch display (high frequency)
+        unsigned long current_stopwatch_display_millis;
         if (stopwatch_running) {
-            unsigned long current_elapsed = millis() - stopwatch_start_time;
-            if (current_elapsed / 10 != stopwatch_elapsed_time / 10) { // Update every hundredth of a second
-                displayStopwatchTime(stopwatch_elapsed_time + current_elapsed);
-            }
+            current_stopwatch_display_millis = stopwatch_elapsed_time + (millis() - stopwatch_start_time);
+        } else {
+            current_stopwatch_display_millis = stopwatch_elapsed_time;
         }
-
-        // Exit condition using long press
-        if (readButtonLongPress()) {
-            menuSprite.setTextFont(1);
-            tone(BUZZER_PIN, 1500, 100); // Exit sound
-            return; // Exit the StopwatchMenu function
+        
+        // Update stopwatch display if hundredths changed OR if real-time clock needs update
+        // This ensures both stopwatch and real-time clock are updated.
+        if (current_stopwatch_display_millis / 10 != last_displayed_stopwatch_millis / 10 || (millis() - last_realtime_clock_update) >= 1000) {
+            displayStopwatchTime(current_stopwatch_display_millis);
+            last_displayed_stopwatch_millis = current_stopwatch_display_millis; // Update last displayed value
+            if ((millis() - last_realtime_clock_update) >= 1000) {
+                last_realtime_clock_update = millis(); // Update real-time clock update time
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(10)); // Small delay to prevent busy-waiting

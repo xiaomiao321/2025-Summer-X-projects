@@ -4,6 +4,7 @@
 #include "Buzzer.h"
 #include "animation.h" // For smoothArc
 #include "Alarm.h"
+#include "weather.h"
 // --- Configuration ---
 const unsigned long WORK_DURATION_SECS = 25 * 60;
 const unsigned long SHORT_BREAK_DURATION_SECS = 5 * 60;
@@ -33,6 +34,21 @@ static unsigned long last_pomodoro_beep_time = 0; // For 5-second warning
 
 static void drawPomodoroUI(unsigned long remaining_secs, unsigned long total_secs) {
     menuSprite.fillScreen(TFT_BLACK);
+
+    // Display current time at the top
+    if (!getLocalTime(&timeinfo)) {
+        // Handle error or display placeholder
+    } else {
+        char time_str[30]; // Increased buffer size
+        strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S %a", &timeinfo); // New format
+        menuSprite.setTextFont(2); // Smaller font for time
+        menuSprite.setTextSize(1);
+        menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+        menuSprite.setTextDatum(MC_DATUM); // Center align
+        menuSprite.drawString(time_str, menuSprite.width() / 2, 10); // Position at top center
+        menuSprite.setTextDatum(TL_DATUM); // Reset datum
+    }
+
     menuSprite.setTextDatum(MC_DATUM);
 
     // --- Draw Title / Current State ---
@@ -111,6 +127,7 @@ void PomodoroMenu() {
     sessions_completed = 0;
     drawPomodoroUI(WORK_DURATION_SECS, WORK_DURATION_SECS); // Initial draw for IDLE state
     unsigned long last_draw_time = 0; // For controlling redraw frequency
+    unsigned long last_realtime_clock_update = millis(); // For real-time clock update
 
     while(true) {
         if (g_alarm_is_ringing) { return; } // ADDED LINE
@@ -181,6 +198,27 @@ void PomodoroMenu() {
                 } else { // A break finished
                     startNewSession(STATE_WORK);
                 }
+            }
+        } else { // If not running (IDLE or PAUSED), update real-time clock
+            unsigned long current_millis = millis();
+            if (current_millis - last_realtime_clock_update >= 1000) { // Update every second
+                unsigned long current_remaining_secs = 0;
+                unsigned long current_total_secs = 0;
+
+                if (currentState == STATE_IDLE) {
+                    current_remaining_secs = WORK_DURATION_SECS;
+                    current_total_secs = WORK_DURATION_SECS;
+                } else if (currentState == STATE_PAUSED) {
+                    current_remaining_secs = remaining_on_pause / 1000;
+                    switch(stateBeforePause) {
+                        case STATE_WORK: current_total_secs = WORK_DURATION_SECS; break;
+                        case STATE_SHORT_BREAK: current_total_secs = SHORT_BREAK_DURATION_SECS; break;
+                        case STATE_LONG_BREAK: current_total_secs = LONG_BREAK_DURATION_SECS; break;
+                        default: current_total_secs = WORK_DURATION_SECS; break; // Fallback
+                    }
+                }
+                drawPomodoroUI(current_remaining_secs, current_total_secs);
+                last_realtime_clock_update = current_millis;
             }
         }
         vTaskDelay(pdMS_TO_TICKS(20));

@@ -69,8 +69,8 @@ static void drawAlarmList() {
     menuSprite.setTextColor(TFT_WHITE);
 
     extern struct tm timeinfo;
-    char titleBuf[30];
-    sprintf(titleBuf, "Alarms %02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    char titleBuf[30]; // Already 30, which is sufficient
+    strftime(titleBuf, sizeof(titleBuf), "%Y-%m-%d %H:%M:%S %a", &timeinfo); // New format
     menuSprite.drawString(titleBuf, 10, 10);
     
     if (alarm_count > ALARMS_PER_PAGE) {
@@ -327,13 +327,18 @@ void Alarm_ShowRingingScreen() {
             extern struct tm timeinfo;
             if (getLocalTime(&timeinfo, 0)) { // Non-blocking get time
                  // Format time
-                char time_buf[9];
-                sprintf(time_buf, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                char time_buf[30]; // Increased buffer size
+                strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %a", &timeinfo); // New format
 
                 // Draw time
                 menuSprite.setTextFont(4); // Or another suitable font
                 menuSprite.setTextColor(TFT_WHITE, TFT_BLACK); // Draw with black background to erase old time
                 menuSprite.drawString(time_buf, 120, 60); // Positioned above "Time's Up!"
+                strftime(time_buf, sizeof(time_buf), "%H:%M:%S", &timeinfo); // New format
+                menuSprite.setTextFont(4); // Or another suitable font
+                menuSprite.setTextColor(TFT_WHITE, TFT_BLACK); // Draw with black background to erase old time
+                menuSprite.drawString(time_buf, 120, 90); // Positioned above "Time's Up!"
+                
             }
              menuSprite.pushSprite(0, 0); // Push the entire sprite to the screen
         }

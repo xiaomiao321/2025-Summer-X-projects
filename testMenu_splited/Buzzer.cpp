@@ -9,6 +9,10 @@
 #include "MQTT.h"
 #include "weather.h"
 #include "Alarm.h"
+#include <freertos/task.h>
+
+TaskHandle_t buzzerTaskHandle = NULL;
+TaskHandle_t ledTaskHandle = NULL;
 // FFT Constants
 #define SAMPLES 256
 #define SAMPLING_FREQUENCY 4000
@@ -31,8 +35,8 @@ PlayMode currentPlayMode = LIST_LOOP; // 默认列表播放
 
 const Song songs[] PROGMEM= {
   { "Cai Bu Tou", melody_cai_bu_tou, durations_cai_bu_tou, sizeof(melody_cai_bu_tou) / sizeof(melody_cai_bu_tou[0]), 0 },
-  {"Chun Jiao Yu Zhi Ming",melody_chun_jiao_yu_zhi_ming,durations_chun_jiao_yu_zhi_ming,sizeof(melody_chun_jiao_yu_zhi_ming)/sizeof(melody_chun_jiao_yu_zhi_ming[0]),1},
   { "Cheng Du", melody_cheng_du, durations_cheng_du, sizeof(melody_cheng_du)/sizeof(melody_cheng_du[0]), 2 },
+    {"Chun Jiao Yu Zhi Ming",melody_chun_jiao_yu_zhi_ming,durations_chun_jiao_yu_zhi_ming,sizeof(melody_chun_jiao_yu_zhi_ming)/sizeof(melody_chun_jiao_yu_zhi_ming[0]),1},
   {"Hai Kuo Tian Kong",melody_hai_kuo_tian_kong,durations_hai_kuo_tian_kong, sizeof(melody_hai_kuo_tian_kong)/sizeof(melody_hai_kuo_tian_kong[0]), 3 },
   { "Hong Dou", melody_hong_dou, durations_hong_dou, sizeof(melody_hong_dou)/sizeof(melody_hong_dou[0]), 4 },
   { "Hou Lai", melody_hou_lai, durations_hou_lai, sizeof(melody_hou_lai)/sizeof(melody_hou_lai[0]), 0 },
@@ -65,24 +69,24 @@ uint32_t mapFrequencyToColor(int frequency) {
 }
 
 // LED effects (blocking versions, to be run in separate task)
-void colorWipe(uint32_t color, int wait) {
-  for (int i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, color);
-    strip.show();
-    vTaskDelay(pdMS_TO_TICKS(wait));
-  }
-}
+// void colorWipe(uint32_t color, int wait) {
+//   for (int i = 0; i < strip.numPixels(); i++) {
+//     strip.setPixelColor(i, color);
+//     strip.show();
+//     vTaskDelay(pdMS_TO_TICKS(wait));
+//   }
+// }
 
-void rainbow(int wait) {
-  for (long firstPixelHue = 0; firstPixelHue < 3 * 65536; firstPixelHue += 256) {
-    for (int i = 0; i < strip.numPixels(); i++) {
-      int pixelHue = firstPixelHue + (i * 65536L / strip.numPixels());
-      strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue)));
-    }
-    strip.show();
-    vTaskDelay(pdMS_TO_TICKS(wait));
-  }
-}
+// void rainbow(int wait) {
+//   for (long firstPixelHue = 0; firstPixelHue < 3 * 65536; firstPixelHue += 256) {
+//     for (int i = 0; i < strip.numPixels(); i++) {
+//       int pixelHue = firstPixelHue + (i * 65536L / strip.numPixels());
+//       strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue)));
+//     }
+//     strip.show();
+//     vTaskDelay(pdMS_TO_TICKS(wait));
+//   }
+// }
 
 bool stopBuzzerTask = false;
 bool isPaused = false;
@@ -103,7 +107,6 @@ typedef struct {
 
 LedEffectCommand currentLedCommand = {0, 0, 0};
 bool stopLedTask = false;
-TaskHandle_t ledTaskHandle = NULL;
 
 // 计算歌曲总时长（秒）
 float calculateSongDuration(const Song* song) {
@@ -185,8 +188,11 @@ void formatTime(char* buf, int totalSeconds) {
   sprintf(buf, "%02d:%02d", minutes, seconds);
 }
 
+static bool stopDrawing = false; // Flag to prevent drawing during exit sequence
+
 // 显示播放界面
 void displayPlayingSong(int songIndex, int noteIndex, int totalNotes, int currentNote, int noteDuration, float elapsedTime) {
+    if (stopDrawing) return;
     static PlayMode lastPlayMode = (PlayMode)-1;
     static char lastTimeStr[20] = "";
     static int lastNoteIndex = -1;
@@ -324,6 +330,7 @@ void Buzzer_Init() {
 }
 
 // LED Animation Task
+// LED Animation Task
 void Led_Task(void *pvParameters) {
   static int colorWipePixel = 0;
   static long rainbowHue = 0;
@@ -333,7 +340,7 @@ void Led_Task(void *pvParameters) {
     if (stopLedTask) {
       strip.clear();
       strip.show();
-      stopLedTask = false; // Reset flag
+      vTaskDelay(pdMS_TO_TICKS(10)); 
       vTaskDelete(NULL); // Self-delete
     }
 
@@ -356,7 +363,7 @@ void Led_Task(void *pvParameters) {
         strip.show();
         colorWipePixel++;
       } else {
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(10));
         strip.clear();
         strip.show();
         currentEffect = 0;
@@ -370,7 +377,7 @@ void Led_Task(void *pvParameters) {
         strip.show();
         rainbowHue += 256;
       } else {
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(10));
         strip.clear();
         strip.show();
         currentEffect = 0;
@@ -400,14 +407,25 @@ void Buzzer_Task(void *pvParameters) {
       currentNoteIndex = 0; // Reset note index
       lastDisplayedNoteIndex = 0; // Reset on exit
       lastDisplayedElapsedTime = 0.0; // Reset on exit
-      vTaskDelay(pdMS_TO_TICKS(50)); // Small delay before deleting
       vTaskDelete(NULL); // Self-delete
     }
 
     // Pause/Resume logic
-    if (isPaused) {
+    while (isPaused) {
       noTone(BUZZER_PIN); // Ensure buzzer is off during pause
-      // Removed vTaskDelay and continue, handled by the while(isPaused) loop below
+      if (stopBuzzerTask) {
+          noTone(BUZZER_PIN);
+          strip.clear();
+          strip.show();
+          firstDraw = true;
+          currentNoteIndex = 0; // Reset note index
+          lastDisplayedNoteIndex = 0; // Reset on exit
+          lastDisplayedElapsedTime = 0.0; // Reset on exit
+          stopBuzzerTask = false; // Reset flag
+          vTaskDelete(NULL); // Self-delete
+      }
+      displayPlayingSong(songIndex, lastDisplayedNoteIndex, song.length, 0, 0, lastDisplayedElapsedTime); // Update display (0 for noteDuration when paused)
+      vTaskDelay(pdMS_TO_TICKS(10)); // Wait before checking again
     }
 
     for (int i = currentNoteIndex; i < song.length; i++) {
@@ -417,10 +435,11 @@ void Buzzer_Task(void *pvParameters) {
         strip.show();
         firstDraw = true;
         currentNoteIndex = 0; // Reset note index
-        goto exit_loop;
+        stopBuzzerTask = false; // Reset flag
+        vTaskDelete(NULL); // Self-delete
       }
 
-// If paused, wait here without advancing the note index
+      // If paused, wait here without advancing the note index
       while (isPaused) {
         noTone(BUZZER_PIN); // Ensure buzzer is off during pause
         if (stopBuzzerTask) {
@@ -431,17 +450,18 @@ void Buzzer_Task(void *pvParameters) {
             currentNoteIndex = 0; // Reset note index
             lastDisplayedNoteIndex = 0; // Reset on exit
             lastDisplayedElapsedTime = 0.0; // Reset on exit
-            goto exit_loop;
+            stopBuzzerTask = false; // Reset flag
+            vTaskDelete(NULL); // Self-delete
         }
         displayPlayingSong(songIndex, lastDisplayedNoteIndex, song.length, 0, 0, lastDisplayedElapsedTime); // Update display (0 for noteDuration when paused)
-        vTaskDelay(pdMS_TO_TICKS(50)); // Wait before checking again
+        vTaskDelay(pdMS_TO_TICKS(10)); // Wait before checking again
       }
 
       int note = pgm_read_word(song.melody+i);
       int duration = pgm_read_word(song.durations+i);
       
       tone(BUZZER_PIN, note, duration*0.9);
-      
+
       currentLedCommand.effectType = (i % 2 == 0) ? 1 : 2;
       currentLedCommand.color = mapFrequencyToColor(note);
       currentLedCommand.frequency = note;
@@ -472,10 +492,11 @@ void Buzzer_Task(void *pvParameters) {
       }
       elapsedTime /= 1000.0; // convert to seconds
 
-      // displayPlayingSong(songIndex, i, song.length, note, elapsedTime); // Initial call removed
-      
       unsigned long noteStartTime = millis();
-      while (millis() - noteStartTime < duration) {
+      unsigned long updateInterval = 40; // 25 FPS
+      unsigned long nextUpdateTime = noteStartTime;
+
+      while (millis() < noteStartTime + duration) {
         if (stopBuzzerTask) {
           noTone(BUZZER_PIN);
           strip.clear();
@@ -484,7 +505,8 @@ void Buzzer_Task(void *pvParameters) {
           currentNoteIndex = 0; // Reset note index
           lastDisplayedNoteIndex = 0; // Reset on exit
           lastDisplayedElapsedTime = 0.0; // Reset on exit
-          goto exit_loop;
+          stopBuzzerTask = false; // Reset flag
+          vTaskDelete(NULL); // Self-delete
         }
         // Recalculate elapsedTime for song progress
         float currentElapsedTime = 0;
@@ -498,7 +520,16 @@ void Buzzer_Task(void *pvParameters) {
         lastDisplayedElapsedTime = currentElapsedTime;
 
         displayPlayingSong(songIndex, i, song.length, note, duration, currentElapsedTime); // Call periodically
-        vTaskDelay(pdMS_TO_TICKS(10));
+
+        // Wait until the next scheduled update time
+        nextUpdateTime += updateInterval;
+        long waitTime = nextUpdateTime - millis(); // Use long for potential negative value
+        if (waitTime > 0) {
+            vTaskDelay(pdMS_TO_TICKS(waitTime));
+        } else {
+            // We're running late, just yield to other tasks
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
       }
 
       noTone(BUZZER_PIN);
@@ -515,7 +546,13 @@ void Buzzer_Task(void *pvParameters) {
       memcpy_P(&song, &songs[songIndex], sizeof(Song));
       currentNoteIndex = 0; // Reset note index for new song
     } else if (currentPlayMode == RANDOM_PLAY) {
-      songIndex = random(numSongs);
+      if (numSongs > 1) {
+        int nextSongIndex = random(numSongs - 1);
+        if (nextSongIndex >= songIndex) {
+          nextSongIndex++;
+        }
+        songIndex = nextSongIndex;
+      }
       memcpy_P(&song, &songs[songIndex], sizeof(Song));
       currentNoteIndex = 0; // Reset note index for new song
     }
@@ -523,10 +560,6 @@ void Buzzer_Task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(2000));
     firstDraw = true;
   }
-exit_loop:
-  strip.clear();
-  strip.show();
-  vTaskDelete(NULL);
 }
 
 void Buzzer_PlayMusic_Task(void *pvParameters) {
@@ -599,6 +632,7 @@ bool detectDoubleClick(bool reset = false) {
 }
 
 // 蜂鸣器菜单函数
+// 蜂鸣器菜单函数
 void BuzzerMenu() {
   tft.init();
   tft.setRotation(1);
@@ -611,6 +645,7 @@ void BuzzerMenu() {
   displayOffset = 0;
   firstDraw = true;
   isPaused = false;
+  stopDrawing = false; // Ensure reset on entry
 
   // detectDoubleClick(true); // Reset double click state on entry
 
@@ -665,32 +700,77 @@ select_song:
   }
 
   // 启动播放任务
-  xTaskCreatePinnedToCore(Buzzer_Task, "Buzzer_Task", 8192, &selectedSongIndex, 1, NULL, 0);
-  xTaskCreatePinnedToCore(Led_Task, "Led_Task", 4096, NULL, 1, NULL, 0);
+  buzzerTaskHandle = NULL;
+  ledTaskHandle = NULL;
+  xTaskCreatePinnedToCore(Buzzer_Task, "Buzzer_Task", 12288, &selectedSongIndex, 1, &buzzerTaskHandle, 0);
+  xTaskCreatePinnedToCore(Led_Task, "Led_Task", 4096, NULL, 1, &ledTaskHandle, 0);
 
   // 播放控制循环
   while (1) {
+    // --- Consolidated Exit Logic ---
+    bool do_exit = false;
     if (exitSubMenu || g_alarm_is_ringing) {
         exitSubMenu = false;
-        stopBuzzerTask = true;
-        stopLedTask = true;
-        vTaskDelay(pdMS_TO_TICKS(150)); // Give tasks time to stop
-        TaskHandle_t buzzerTaskHandle = xTaskGetHandle("Buzzer_Task"); // Wait for Buzzer_Task
-        if (buzzerTaskHandle != NULL) {
-          const TickType_t xTimeout = pdMS_TO_TICKS(100);
-          while (eTaskGetState(buzzerTaskHandle) != eDeleted && xTimeout > 0) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-          }
-        }
-        TaskHandle_t ledTaskHandle = xTaskGetHandle("Led_Task"); // Wait for Led_Task
-        if (ledTaskHandle != NULL) {
-          const TickType_t xTimeout = pdMS_TO_TICKS(100);
-          while (eTaskGetState(ledTaskHandle) != eDeleted && xTimeout > 0) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-          }
-        }
-        return;
+        do_exit = true;
     }
+    if (readButtonLongPress()) {
+        do_exit = true;
+    }
+
+    // 替换 BuzzerMenu 函数中的退出部分
+if (do_exit) {
+    // 1. 设置停止标志
+    stopDrawing = true;
+    stopBuzzerTask = true;
+    stopLedTask = true;
+
+    // 2. 等待任务结束（带超时）
+    const TickType_t timeout = pdMS_TO_TICKS(1000);
+    TickType_t startTime = xTaskGetTickCount();
+    
+    // 等待蜂鸣器任务结束
+    if (buzzerTaskHandle != NULL) {
+        while (eTaskGetState(buzzerTaskHandle) != eDeleted && 
+               (xTaskGetTickCount() - startTime) < timeout) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+    
+    // 等待LED任务结束
+    if (ledTaskHandle != NULL) {
+        while (eTaskGetState(ledTaskHandle) != eDeleted && 
+               (xTaskGetTickCount() - startTime) < timeout) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+    
+    // 3. 强制删除任务（如果超时）
+    if (buzzerTaskHandle != NULL && eTaskGetState(buzzerTaskHandle) != eDeleted) {
+        vTaskDelete(buzzerTaskHandle);
+    }
+    if (ledTaskHandle != NULL && eTaskGetState(ledTaskHandle) != eDeleted) {
+        vTaskDelete(ledTaskHandle);
+    }
+    
+    // 4. 清理硬件
+    noTone(BUZZER_PIN);
+    strip.clear();
+    strip.show();
+    
+    // 5. 清理屏幕
+    menuSprite.fillScreen(TFT_BLACK);
+    menuSprite.pushSprite(0, 0);
+    
+    // 6. 重置标志和句柄
+    stopDrawing = false;
+    stopBuzzerTask = false;
+    stopLedTask = false;
+    buzzerTaskHandle = NULL;
+    ledTaskHandle = NULL;
+    isPaused = false;
+    
+    return;
+}
 
     // 旋转编码器：切换播放模式
     int encoderChange = readEncoder();
@@ -706,27 +786,6 @@ select_song:
         case LIST_LOOP: Serial.println("列表播放"); break;
         case RANDOM_PLAY: Serial.println("随机播放"); break;
       }
-    }
-    if(readButtonLongPress())
-    {
-        stopBuzzerTask = true;
-        stopLedTask = true; // Signal Led_Task to stop
-        TaskHandle_t buzzerTaskHandle = xTaskGetHandle("Buzzer_Task");
-        if (buzzerTaskHandle != NULL) {
-          const TickType_t xTimeout = pdMS_TO_TICKS(100);
-          while (eTaskGetState(buzzerTaskHandle) != eDeleted && xTimeout > 0) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-          }
-        }
-        TaskHandle_t ledTaskHandle = xTaskGetHandle("Led_Task"); // Get handle for Led_Task
-        if (ledTaskHandle != NULL) {
-          const TickType_t xTimeout = pdMS_TO_TICKS(100); // Use same timeout
-          while (eTaskGetState(ledTaskHandle) != eDeleted && xTimeout > 0) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-          }
-        }
-        // Led_Task will self-delete
-        return;
     }
     // 按钮：单击暂停/播放，双击返回歌曲选择
     if (readButton()) {
