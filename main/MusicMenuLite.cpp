@@ -1,4 +1,5 @@
 #include "MusicMenuLite.h"
+#include "Alarm.h"
 #include "Buzzer.h" // For song definitions, numSongs, PlayMode enum
 #include "RotaryEncoder.h"
 #include "Menu.h"

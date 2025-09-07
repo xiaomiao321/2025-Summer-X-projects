@@ -9,11 +9,13 @@
 #include "DS18B20.h"
 #include "WiFiManager.h"
 #include "Alarm.h"
+#include "TargetSettings.h"
 
 
 
 void setup() {
     bootSystem();
+    
     // Initialize MQTT, assuming WiFi is now connected
     // connectMQTT(); 
 }

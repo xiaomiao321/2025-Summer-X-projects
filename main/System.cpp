@@ -1,4 +1,7 @@
 #include <Arduino.h>
+#include <EEPROM.h>
+
+#define EEPROM_SIZE 256
 #include <TFT_eSPI.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -18,6 +21,7 @@
 #include "img.h"
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include "TargetSettings.h"
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 240
 extern DallasTemperature sensors;
@@ -108,6 +112,56 @@ void displaySystemInfoTypewriter() {
     tftLogInfo(sdkInfo);
 }
 
+// 显示EEPROM中存储的目标设置
+void displayEepromInfo() {
+    tftClearLog();
+    tftLogInfo("TARGET SETTINGS (from EEPROM)");
+    tft.drawFastHLine(0, 55, SCREEN_WIDTH, TFT_DARKCYAN);
+
+    char buffer[64];
+    struct tm time_info;
+
+    // 获取并显示进度条信息
+    const ProgressBarInfo& progress = getProgressBarInfo();
+    snprintf(buffer, sizeof(buffer), "Progress Title: %s", progress.title);
+    tftLogInfo(buffer);
+
+    localtime_r(&progress.startTime, &time_info);
+    strftime(buffer, sizeof(buffer), "Start: %Y-%m-%d", &time_info);
+    tftLogInfo(buffer);
+
+    localtime_r(&progress.endTime, &time_info);
+    strftime(buffer, sizeof(buffer), "End:   %Y-%m-%d", &time_info);
+    tftLogInfo(buffer);
+
+    // 获取并显示倒计时目标
+    time_t countdown = getCountdownTarget();
+    localtime_r(&countdown, &time_info);
+    strftime(buffer, sizeof(buffer), "Target: %Y-%m-%d %H:%M", &time_info);
+    tftLogInfo(buffer);
+
+    // 获取并显示闹钟信息
+    int alarmCount = getAlarmCount();
+    if (alarmCount > 0) {
+        tftLogInfo(" "); // Add a blank line for spacing
+        tftLogInfo("Alarms:");
+        for (int i = 0; i < alarmCount; ++i) {
+            AlarmSetting alarm;
+            if (getAlarmInfo(i, alarm)) {
+                char days_str[8] = {0};
+                const char* day_letters = "SMTWTFS";
+                for(int d=0; d<7; ++d) {
+                    if(alarm.days_of_week & (1 << d)) {
+                        days_str[strlen(days_str)] = day_letters[d];
+                    }
+                }
+                snprintf(buffer, sizeof(buffer), " - %02d:%02d %s %s", alarm.hour, alarm.minute, alarm.enabled ? "ON" : "OFF", days_str);
+                tftLogInfo(buffer);
+            }
+        }
+    }
+}
+
 // 硬件测试函数（打字机效果）
 void hardwareTest() {
    
@@ -121,29 +175,9 @@ void hardwareTest() {
     tftLogInfo("Testing DS18B20...");
     sensors.begin();
     int deviceCount = sensors.getDeviceCount();
-    char deviceStr[40];
-    sprintf(deviceStr, "Found %d DS18B20 sensor(s)", deviceCount);
-    tftLogSuccess(deviceStr);
-
     if (deviceCount == 0) {
         tftLogError("No DS18B20 sensors detected");
         return;
-    }
-
-    // 获取传感器分辨率
-    uint8_t resolution = sensors.getResolution();
-    char resStr[30];
-    sprintf(resStr, "Resolution: %d bits", resolution);
-    tftLogInfo(resStr);
-    sensors.requestTemperatures();
-    delay(1000);
-    float tempC = sensors.getTempCByIndex(0);
-    if (tempC != DEVICE_DISCONNECTED_C) {
-        char tempStr[30];
-        sprintf(tempStr, "Temp: %.1fC OK", tempC);
-        tftLogInfo(tempStr);
-    } else {
-        tftLogError("DS18B20: FAILED");
     }
 
     DeviceAddress deviceAddress;
@@ -174,7 +208,7 @@ void hardwareTest() {
 
 // 开机动画函数
 void bootAnimation() {
-    static int boot_song_index = 14-2; // "Windows XP"
+    static int boot_song_index = 14-1; // "Windows XP"
     xTaskCreatePinnedToCore(Buzzer_PlayMusic_Task, "BootSound", 8192, &boot_song_index, 1, NULL, 0);
     // tft.fillScreen(TFT_BLACK);
     const uint16_t* boot_gif[16] = {huaji_0,huaji_1,huaji_2,huaji_3,huaji_4,huaji_5,huaji_6,huaji_7,huaji_8,huaji_9,huaji_10,huaji_11,huaji_12,huaji_13,huaji_14,huaji_15};
@@ -206,6 +240,10 @@ void bootAnimation() {
     // 显示系统信息
     displaySystemInfoTypewriter();
     delay(1000);
+
+    // 显示EEPROM信息
+    displayEepromInfo();
+    delay(1000);
     
     // 清屏进行硬件测试
     tftClearLog();
@@ -233,6 +271,7 @@ void bootAnimation() {
 // 系统初始化函数
 void bootSystem() {
     Serial.begin(115200);
+    EEPROM.begin(EEPROM_SIZE);
     // 初始化硬件
     Buzzer_Init();
     initRotaryEncoder();
@@ -242,10 +281,9 @@ void bootSystem() {
     tft.setRotation(1);
     tft.fillScreen(TFT_BLACK);
     tft.setTextDatum(TL_DATUM);
-
-    setupADC();
     menuSprite.createSprite(239, 239);
-
+    TargetSettings_Init();
+    setupADC();
 
     // 运行开机动画
     bootAnimation();

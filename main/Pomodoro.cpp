@@ -1,4 +1,5 @@
 #include "Pomodoro.h"
+#include "Alarm.h"
 #include "Menu.h"
 #include "RotaryEncoder.h"
 #include "Buzzer.h"

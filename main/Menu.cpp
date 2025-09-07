@@ -1,5 +1,6 @@
 #include "RotaryEncoder.h"
-#include <TFT_eSPI.h>
+#include <Arduino.h>
+#include "Alarm.h"
 #include "img.h"
 #include "LED.h"
 #include "Buzzer.h"
@@ -14,6 +15,7 @@
 #include "Watchface.h" // <-- ADDED
 #include "MQTT.h"
 #include "MusicMenuLite.h"
+#include <TFT_eSPI.h>
 // --- Layout Configuration ---
 // Change these values to adjust the menu layout
 static const int ICON_SIZE = 200;     // The size for the icons (e.g., 180x180)

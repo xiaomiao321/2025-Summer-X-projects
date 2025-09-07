@@ -1,19 +1,28 @@
 #ifndef ALARM_H
 #define ALARM_H
 
-// Flag to indicate that an alarm is currently ringing
-extern volatile bool g_alarm_is_ringing;
+#include <stdint.h>
 
-// Initializes the alarm module and starts the background checking task
+extern volatile bool g_alarm_is_ringing; // Make this global flag accessible
+
+// Moved from .cpp to be public
+struct AlarmSetting {
+  uint8_t hour;
+  uint8_t minute;
+  uint8_t days_of_week;
+  bool enabled;
+  bool triggered_today;
+};
+
 void Alarm_Init();
-
-// The main UI for the alarm settings
 void AlarmMenu();
-
-// The UI to show when an alarm is ringing
+void Alarm_Loop_Check();
 void Alarm_ShowRingingScreen();
-
-// Stops the currently playing alarm music
 void Alarm_StopMusic();
+
+// New functions to get alarm data
+int getAlarmCount();
+bool getAlarmInfo(int index, AlarmSetting& settings);
+
 
 #endif // ALARM_H

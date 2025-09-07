@@ -1,4 +1,5 @@
 #include "Stopwatch.h"
+#include "Alarm.h"
 #include "Menu.h"
 #include "MQTT.h"
 #include "Buzzer.h"

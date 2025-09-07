@@ -1,5 +1,6 @@
 #include <Arduino.h>
-#include "driver/adc.h"
+#include "ADC.h"
+#include "Alarm.h"
 #include "esp_adc_cal.h"
 #include <TFT_eSPI.h>
 #include <TFT_eWidget.h>
@@ -8,7 +9,7 @@
 #include "RotaryEncoder.h"
 #include "Alarm.h"
 #include <math.h>
-
+#include "driver/adc.h"
 MeterWidget volts = MeterWidget(&tft);
 
 #define BAT_PIN         2

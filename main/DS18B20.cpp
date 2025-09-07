@@ -1,4 +1,5 @@
 #include "DS18B20.h"
+#include "Alarm.h"
 #include <TFT_eSPI.h>
 #include <TFT_eWidget.h>
 #include "MQTT.h"

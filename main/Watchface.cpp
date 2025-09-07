@@ -10,6 +10,7 @@
 #include "img.h"
 #include <time.h> // For struct tm
 #include "DS18B20.h"
+#include "TargetSettings.h"
 
 #define MENU_FONT 1
 #define WEATHER_INTERVAL_MIN 30
@@ -47,12 +48,14 @@ static void SimClockWatchface();
 static void PlaceholderWatchface();
 static void VectorScrollWatchface_SEG();
 static void VectorScanWatchface_SEG();
+
 struct WatchfaceItem {
     const char *name;
     void (*show)();
 };
 
 const WatchfaceItem watchfaceItems[] = {
+    {"Target Settings", TargetSettings_Menu},
     // {"Charge", ChargeWatchface},
     {"Scan", VectorScanWatchface},
     {"Scan_SEG",VectorScanWatchface_SEG},
@@ -109,6 +112,12 @@ void WatchfaceMenu() {
             return; // Exit WatchfaceMenu
         }
         if (g_alarm_is_ringing) { return; } // ADDED LINE
+
+        if (readButtonLongPress()) { 
+            tone(BUZZER_PIN, 1500, 100);
+            return; 
+        }
+
         int encoderChange = readEncoder();
         if (encoderChange != 0) {
             selectedIndex = (selectedIndex + encoderChange + WATCHFACE_COUNT) % WATCHFACE_COUNT;
@@ -294,13 +303,13 @@ static void drawCommonElements() {
     menuSprite.setTextDatum(BC_DATUM);
     menuSprite.setTextSize(1);
     menuSprite.setTextColor(TFT_CYAN, TFT_BLACK);
-    menuSprite.drawString(lastSyncTimeStr, 120, tft.height() - 15);
+    menuSprite.drawString(lastSyncTimeStr, 120, tft.height() - 5);
 
     // Last Sync Weather
     menuSprite.setTextDatum(BC_DATUM);
     menuSprite.setTextSize(1);
     menuSprite.setTextColor(TFT_YELLOW, TFT_BLACK);
-    menuSprite.drawString(lastWeatherSyncStr, 120, tft.height()-25);
+    menuSprite.drawString(lastWeatherSyncStr, 120, tft.height()-15);
 
     // DS18B20 Temperature
     menuSprite.setTextDatum(BC_DATUM);
@@ -309,7 +318,7 @@ static void drawCommonElements() {
     float temp = getDS18B20Temp();
     String tempStr = "DS18B20: " + String(temp, 1) + " C";
     menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
-    menuSprite.drawString(tempStr, 120, tft.height() - 45);
+    menuSprite.drawString(tempStr, 120, tft.height() - 35);
 
     // WiFi Status
     menuSprite.setTextDatum(BC_DATUM);
@@ -322,8 +331,13 @@ static void drawCommonElements() {
     {
         menuSprite.setTextColor(TFT_RED,TFT_BLACK);
     }
-    menuSprite.drawString(wifiStatusStr, 120, tft.height()-35); // 10 pixels above lastWeatherSyncStr
+    menuSprite.drawString(wifiStatusStr, 120, tft.height()-25); // 10 pixels above lastWeatherSyncStr
     menuSprite.setTextColor(TIME_MAIN_COLOR,TFT_BLACK);
+}
+
+static void drawAdvancedCommonElements() {
+    drawCommonElements();
+    drawTargetElements(&menuSprite);
 }
 
 // =================================================================================================
@@ -387,7 +401,7 @@ static void ChargeWatchface() {
 
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextDatum(MC_DATUM);
         char timeStr[10];
@@ -800,7 +814,7 @@ static void PlaceholderWatchface() {
 
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(MC_DATUM);
@@ -943,7 +957,7 @@ static void VectorScrollWatchface() {
         last_time = g_watchface_timeDate.time;
 
         menuSprite.fillSprite(TFT_BLACK);
-        drawCommonElements(); 
+        drawAdvancedCommonElements(); 
         menuSprite.setTextDatum(TL_DATUM);
 
         // Update and draw tickers
@@ -1059,7 +1073,7 @@ static void VectorScanWatchface() {
         last_time = g_watchface_timeDate.time;
 
         menuSprite.fillSprite(TFT_BLACK);
-        drawCommonElements();
+        drawAdvancedCommonElements();
         menuSprite.setTextDatum(TL_DATUM);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
   // Update and draw tickers
@@ -1126,7 +1140,7 @@ static void SimpleClockWatchface() {
         
         getLocalTime(&timeinfo);
         menuSprite.fillSprite(TFT_BLACK);
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(MC_DATUM);
@@ -1136,8 +1150,9 @@ static void SimpleClockWatchface() {
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
+        int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = tft.height()/2 + 20;
+        int timeY = (tft.height() - timeHeight)/2;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1203,7 +1218,7 @@ static void shared_rain_logic(uint16_t color) {
             draw_char(i * 8, rain_pos[i], rain_chars[i], color, TFT_BLACK, 1);
         }
         
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(MC_DATUM);
@@ -1213,8 +1228,9 @@ static void shared_rain_logic(uint16_t color) {
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
+        int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = tft.height()/2 + 20;
+        int timeY = (tft.height() - timeHeight)/2;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1272,7 +1288,7 @@ static void SnowWatchface() {
             menuSprite.drawPixel(p.first, p.second, TFT_WHITE);
         }
         
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(MC_DATUM);
@@ -1282,8 +1298,9 @@ static void SnowWatchface() {
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
+        int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = tft.height()/2 + 20;
+        int timeY = (tft.height() - timeHeight)/2;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1337,7 +1354,7 @@ static void WavesWatchface() {
         }
         time += 0.1;
         
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(MC_DATUM);
@@ -1347,8 +1364,9 @@ static void WavesWatchface() {
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
+        int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = tft.height()/2 + 20;
+        int timeY = (tft.height() - timeHeight)/2;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1401,7 +1419,7 @@ static void NenoWatchface() {
         menuSprite.drawLine(tft.width()-x1, y1, tft.width()-x2, y2, TFT_BLUE);
         time += 0.05;
         
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(MC_DATUM);
@@ -1411,8 +1429,9 @@ static void NenoWatchface() {
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
+        int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = tft.height()/2 + 20;
+        int timeY = (tft.height() - timeHeight)/2;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1475,7 +1494,7 @@ static void BallsWatchface() {
             menuSprite.fillCircle(b.x, b.y, 5, b.color);
         }
         
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(MC_DATUM);
@@ -1485,8 +1504,9 @@ static void BallsWatchface() {
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
+        int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = tft.height()/2 + 20;
+        int timeY = (tft.height() - timeHeight)/2;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1553,7 +1573,7 @@ static void SandBoxWatchface() {
             }
         }
         
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextFont(1);
         menuSprite.setTextDatum(MC_DATUM);
@@ -1563,8 +1583,9 @@ static void SandBoxWatchface() {
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
         
         int timeWidth = menuSprite.textWidth(timeStr);
+        int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = tft.height()/2 + 20;
+        int timeY = (tft.height() - timeHeight)/2;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1782,7 +1803,7 @@ static void VectorScrollWatchface_SEG() {
 
         menuSprite.fillSprite(TFT_BLACK);
         menuSprite.setTextFont(1);
-        drawCommonElements();
+        drawAdvancedCommonElements();
         menuSprite.setTextDatum(TL_DATUM);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
 
@@ -1933,7 +1954,7 @@ static void VectorScanWatchface_SEG() {
         menuSprite.fillSprite(TFT_BLACK);
 
         menuSprite.setTextFont(1); // Set default font
-        drawCommonElements();
+        drawAdvancedCommonElements();
 
         menuSprite.setTextDatum(TL_DATUM);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);

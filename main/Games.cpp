@@ -10,6 +10,7 @@
 #include "DS18B20.h"
 #include "animation.h"
 #include "Games.h"
+#include "Alarm.h"
 #include "MQTT.h"
 #include <vector> // For std::vector
 

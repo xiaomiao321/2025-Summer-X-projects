@@ -1,4 +1,5 @@
 #include "LED.h"
+#include "Alarm.h"
 #include "RotaryEncoder.h"
 #include "Alarm.h"
 #include <TFT_eSPI.h>

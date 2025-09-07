@@ -1,4 +1,5 @@
 #include "Buzzer.h"
+#include "Alarm.h"
 #include "RotaryEncoder.h"
 #include <TFT_eSPI.h>
 #include <time.h>
@@ -32,6 +33,7 @@ const Song songs[] PROGMEM= {
   { "Cheng Du", melody_cheng_du, durations_cheng_du, sizeof(melody_cheng_du)/sizeof(melody_cheng_du[0]), 2 },
   {"Hai Kuo Tian Kong",melody_hai_kuo_tian_kong,durations_hai_kuo_tian_kong, sizeof(melody_hai_kuo_tian_kong)/sizeof(melody_hai_kuo_tian_kong[0]), 3 },
   { "Hong Dou", melody_hong_dou, durations_hong_dou, sizeof(melody_hong_dou)/sizeof(melody_hong_dou[0]), 4 },
+  { "Hong Se Gao Gen Xie", melody_hong_se_gao_gen_xie, durations_hong_se_gao_gen_xie, sizeof(melody_hong_se_gao_gen_xie)/sizeof(melody_hong_se_gao_gen_xie[0]), 0 },
   { "Hou Lai", melody_hou_lai, durations_hou_lai, sizeof(melody_hou_lai)/sizeof(melody_hou_lai[0]), 0 },
   { "Kai Shi Dong Le", melody_kai_shi_dong_le, durations_kai_shi_dong_le, sizeof(melody_kai_shi_dong_le)/sizeof(melody_kai_shi_dong_le[0]), 1 },
   { "Lv Se", melody_lv_se, durations_lv_se, sizeof(melody_lv_se)/sizeof(melody_lv_se[0]), 2 },

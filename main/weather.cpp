@@ -559,7 +559,7 @@ bool fetchWeather() {
         tftLog(log_buffer,TFT_YELLOW);
 
         if (http.begin(client, url)) {
-            http.setTimeout(15000);
+            http.setTimeout(5000);
             http.addHeader("User-Agent", "ESP32-Weather");
             http.addHeader("Connection", "close");
 

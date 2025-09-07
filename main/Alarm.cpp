@@ -17,18 +17,6 @@
 volatile bool g_alarm_is_ringing = false;
 
 // --- Bitmasks for Days of the Week ---
-const uint8_t DAY_SUN = 1; const uint8_t DAY_MON = 2; const uint8_t DAY_TUE = 4;
-const uint8_t DAY_WED = 8; const uint8_t DAY_THU = 16; const uint8_t DAY_FRI = 32;
-const uint8_t DAY_SAT = 64; const uint8_t DAYS_ALL = 0x7F;
-
-// --- Data Structures ---
-struct AlarmSetting {
-  uint8_t hour;
-  uint8_t minute;
-  uint8_t days_of_week;
-  bool enabled;
-  bool triggered_today;
-};
 
 enum EditMode { EDIT_HOUR, EDIT_MINUTE, EDIT_DAYS, EDIT_SAVE, EDIT_DELETE };
 
@@ -256,7 +244,6 @@ void Alarm_StopMusic() {
 }
 
 void Alarm_Init() {
-  EEPROM.begin(sizeof(alarms) + 1);
   loadAlarms();
   last_checked_day = -1;
   
@@ -482,4 +469,20 @@ void AlarmMenu() {
         }
         vTaskDelay(pdMS_TO_TICKS(20));
     }
+}
+
+// =====================================================================================
+//                                     PUBLIC GETTERS
+// =====================================================================================
+
+int getAlarmCount() {
+    return alarm_count;
+}
+
+bool getAlarmInfo(int index, AlarmSetting& settings) {
+    if (index < 0 || index >= alarm_count) {
+        return false;
+    }
+    settings = alarms[index];
+    return true;
 }

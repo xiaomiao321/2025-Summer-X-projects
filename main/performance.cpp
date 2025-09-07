@@ -1,4 +1,5 @@
-#include "Performance.h"
+#include "performance.h"
+#include "Alarm.h"
 #include <TFT_eWidget.h>
 #include "Menu.h"
 #include "MQTT.h"

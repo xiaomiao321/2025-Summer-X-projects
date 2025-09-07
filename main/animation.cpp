@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "Alarm.h"
 #include "Menu.h"
 #include "MQTT.h"
 #include "RotaryEncoder.h"
