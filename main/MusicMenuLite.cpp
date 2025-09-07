@@ -100,7 +100,7 @@ void MusicLite_Playback_Task(void *pvParameters) {
             shared_current_note_frequency = note;
 
             if (note > 0) {
-                tone(BUZZER_PIN, note, duration * 0.9);
+                tone(BUZZER_PIN, note, duration);
             }
             
             vTaskDelay(pdMS_TO_TICKS(duration));

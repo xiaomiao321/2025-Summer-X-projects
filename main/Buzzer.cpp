@@ -225,10 +225,11 @@ void Buzzer_Task(void *pvParameters) {
       int duration = pgm_read_word(song.durations+i);
       generate_fake_spectrum(note);
       if (note > 0) {
-        tone(BUZZER_PIN, note, duration*0.9);
+        tone(BUZZER_PIN, note, duration);
       }
       vTaskDelay(pdMS_TO_TICKS(duration));
     }
+    vTaskDelay(pdMS_TO_TICKS(2000));
     if (currentPlayMode == SINGLE_LOOP) {}
     else if (currentPlayMode == LIST_LOOP) {
       songIdx = (songIdx + 1) % numSongs;
@@ -258,7 +259,7 @@ void Buzzer_PlayMusic_Task(void *pvParameters) {
     int duration = pgm_read_word(song.durations + i);
     
     if (note > 0) {
-        tone(BUZZER_PIN, note, duration * 0.9);
+        tone(BUZZER_PIN, note, duration);
     }
     
     vTaskDelay(pdMS_TO_TICKS(duration));

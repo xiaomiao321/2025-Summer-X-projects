@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "random": "cpp",
+        "xstring": "cpp",
+        "initializer_list": "cpp",
+        "vector": "cpp",
+        "xutility": "cpp",
+        "cstddef": "cpp",
+        "cmath": "cpp"
+    }
+}
