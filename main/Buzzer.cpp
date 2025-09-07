@@ -25,10 +25,6 @@ static volatile int shared_song_index = 0;
 static volatile int shared_note_index = 0;
 static volatile TickType_t current_note_start_tick = 0;
 
-// --- Spectrum Visualization ---
-#define NUM_BANDS 16
-volatile float spectrum[NUM_BANDS];
-
 // --- Song Data ---
 const Song songs[] PROGMEM= {
   { "Cai Bu Tou", melody_cai_bu_tou, durations_cai_bu_tou, sizeof(melody_cai_bu_tou) / sizeof(melody_cai_bu_tou[0]), 0 },
@@ -56,20 +52,6 @@ const int visibleSongs = 3;
 static void stop_buzzer_playback();
 
 // --- Helper Functions ---
-void generate_fake_spectrum(int frequency) {
-    for (int i = 0; i < NUM_BANDS; i++) { spectrum[i] = 0.0f; }
-    if (frequency <= 0) return;
-    const float min_log_freq = log(200);
-    const float max_log_freq = log(2000);
-    float log_freq = log(frequency);
-    int band = NUM_BANDS * (log_freq - min_log_freq) / (max_log_freq - min_log_freq);
-    if (band < 0) band = 0;
-    if (band >= NUM_BANDS) band = NUM_BANDS - 1;
-    spectrum[band] = 70.0f;
-    if (band > 0) spectrum[band - 1] = 35.0f;
-    if (band < NUM_BANDS - 1) spectrum[band + 1] = 35.0f;
-}
-
 static uint32_t calculateSongDuration_ms(int songIndex) {
     if (songIndex < 0 || songIndex >= numSongs) return 0;
     Song song;
@@ -140,21 +122,63 @@ void displayPlayingSong() {
         menuSprite.drawString(timeStr, 120, 50);
     }
 
-    String status_text = isPaused ? "Paused / " : "Playing / ";
-    switch (currentPlayMode) {
-        case SINGLE_LOOP: status_text += "Single Loop"; break;
-        case LIST_LOOP: status_text += "List Loop"; break;
-        case RANDOM_PLAY: status_text += "Random"; break;
-    }
+    // Display Play/Pause status
+    String status_text = isPaused ? "Paused" : "Playing";
     menuSprite.drawString(status_text, 120, 80);
 
-    int barWidth = 8;
-    int barSpacing = 14;
-    for (int i = 0; i < NUM_BANDS; i++) {
-        int barHeight = spectrum[i];
-        if (barHeight > 70) barHeight = 70;
-        if (barHeight > 0) {
-            menuSprite.fillRoundRect(10 + i * barSpacing, 170 - barHeight, barWidth, barHeight, 4, TFT_CYAN);
+    // Display Play Mode below status
+    String mode_text;
+    switch (currentPlayMode) {
+        case SINGLE_LOOP: mode_text = "Single Loop"; break;
+        case LIST_LOOP:   mode_text = "List Loop"; break;
+        case RANDOM_PLAY: mode_text = "Random"; break;
+    }
+    menuSprite.setTextSize(1); // Use smaller text for the mode
+    menuSprite.drawString(mode_text, 120, 100);
+    menuSprite.setTextSize(2); // Reset text size
+
+    // --- Time-domain song visualization ---
+    Song current_song;
+    memcpy_P(&current_song, &songs[shared_song_index], sizeof(Song));
+
+    if (current_song.length > 0) {
+        // Find min (non-zero) and max frequency for scaling
+        int min_freq = 10000;
+        int max_freq = 0;
+        for (int i = 0; i < current_song.length; i++) {
+            int freq = pgm_read_word(current_song.melody + i);
+            if (freq > 0) {
+                if (freq < min_freq) min_freq = freq;
+                if (freq > max_freq) max_freq = freq;
+            }
+        }
+        // Handle songs with no audible notes or a single note
+        if (min_freq > max_freq) { min_freq = 200; max_freq = 2000; }
+        if (min_freq == max_freq) { min_freq = max_freq / 2; }
+
+        // Drawing parameters
+        const int graph_x = 10;
+        const int graph_y_bottom = 180;
+        const int graph_area_width = 220;
+        const int max_bar_height = 75; // Increased from 60
+        const int min_bar_height = 2;
+
+        float step = (float)graph_area_width / current_song.length;
+        int bar_width = (step > 1.0f) ? floor(step * 0.8f) : 1; // 80% of space, or 1px minimum
+        if (bar_width == 0) bar_width = 1;
+
+        for (int i = 0; i < current_song.length; i++) {
+            int freq = pgm_read_word(current_song.melody + i);
+            int bar_height = 0;
+            if (freq > 0) {
+                bar_height = map(freq, min_freq, max_freq, min_bar_height, max_bar_height);
+            }
+
+            if (bar_height > 0) {
+                uint16_t color = (i <= shared_note_index) ? TFT_CYAN : TFT_DARKGREY;
+                int x_pos = graph_x + floor(i * step);
+                menuSprite.fillRect(x_pos, graph_y_bottom - bar_height, bar_width, bar_height, color);
+            }
         }
     }
 
@@ -169,6 +193,18 @@ void displayPlayingSong() {
     char time_buf[20];
     snprintf(time_buf, sizeof(time_buf), "%02d:%02d / %02d:%02d", elapsed_ms / 60000, (elapsed_ms / 1000) % 60, total_ms / 60000, (total_ms / 1000) % 60);
     menuSprite.drawString(time_buf, 120, 210);
+
+    // --- Current Note Info ---
+    int current_freq = 0;
+    int current_dur = 0;
+    if (!isPaused && shared_note_index < current_song.length) {
+        current_freq = pgm_read_word(current_song.melody + shared_note_index);
+        current_dur = pgm_read_word(current_song.durations + shared_note_index);
+    }
+    char note_info[30];
+    snprintf(note_info, sizeof(note_info), "Note: %d Hz, %d ms", current_freq, current_dur);
+    menuSprite.setTextSize(1); // Use smaller text
+    menuSprite.drawString(note_info, 120, 228);
 
     menuSprite.pushSprite(0, 0);
 }
@@ -216,14 +252,12 @@ void Buzzer_Task(void *pvParameters) {
         vTaskDelete(NULL);
       }
       while (isPaused) {
-        generate_fake_spectrum(0);
         noTone(BUZZER_PIN);
         current_note_start_tick = xTaskGetTickCount();
         vTaskDelay(pdMS_TO_TICKS(50));
       }
       int note = pgm_read_word(song.melody+i);
       int duration = pgm_read_word(song.durations+i);
-      generate_fake_spectrum(note);
       if (note > 0) {
         tone(BUZZER_PIN, note, duration);
       }

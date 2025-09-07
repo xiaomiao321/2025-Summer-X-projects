@@ -143,7 +143,7 @@ void showMenu() {
         } else if (direction == -1) { // Left
             picture_flag = (picture_flag == 0) ? MENU_ITEM_COUNT - 1 : picture_flag - 1;
         }
-        tone(BUZZER_PIN, 1000*(picture_flag + 1), 20);
+        tone(BUZZER_PIN, 1000, 20);
         int16_t start_display = display; // Capture the starting position
         int16_t target_display = INITIAL_X_OFFSET - (picture_flag * ICON_SPACING);
         

@@ -6,6 +6,7 @@
 #include <Preferences.h>
 #include "Menu.h" // For using the menuSprite for display
 #include "System.h" // For tftLog
+#include "weather.h" // For connectWiFi() fallback
 
 // --- Objects ---
 WebServer server(80);
@@ -137,7 +138,8 @@ bool connectWiFi_with_Manager() {
         WiFi.begin(saved_ssid.c_str(), saved_pass.c_str());
         tftLog("WiFi.begin() called", TFT_YELLOW);
         int attempts = 0;
-        while (WiFi.status() != WL_CONNECTED && attempts < 20) { // 10 second timeout
+        while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+            tftLog("attempt " + String(attempts+1) + " of 10", TFT_WHITE); // 5 second timeout
             delay(500);
             attempts++;
         }
@@ -149,6 +151,19 @@ bool connectWiFi_with_Manager() {
         }
         
         tftLog("Connection FAILED.", TFT_RED);
+        tftLog("Trying fallback method...", TFT_YELLOW);
+        delay(2000);
+
+        // Call the fallback function from weather.cpp
+        if (connectWiFi()) {
+            // Fallback connection was successful
+            tftLog("Fallback SUCCESS!", TFT_GREEN);
+            delay(1500);
+            return true;
+        }
+        tftClearLog();
+        // If we are here, both saved credentials and fallback failed.
+        tftLog("Fallback FAILED.", TFT_RED);
         delay(2000);
 
     } else {

@@ -317,6 +317,7 @@ void tftLog(String text, uint16_t color) {
     tft.setTextSize(1);
     // 检查是否需要清屏滚动
     if (current_log_lines >= LOG_MAX_LINES) {
+        delay(1000); // Wait for 1 second before clearing
         tftClearLog();
     }
     
@@ -378,6 +379,7 @@ void tftLogProgress(const String& text, int progress, int total) {
 void tftLogFast(const String& text, uint16_t color = TFT_GREEN) {
     // 检查是否需要清屏滚动
     if (current_log_lines >= LOG_MAX_LINES) {
+        delay(1000); // Wait for 1 second before clearing
         tftClearLog();
     }
     
