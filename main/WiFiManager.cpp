@@ -157,6 +157,7 @@ bool connectWiFi_with_Manager() {
         // Call the fallback function from weather.cpp
         if (connectWiFi()) {
             // Fallback connection was successful
+            tftClearLog();
             tftLog("Fallback SUCCESS!", TFT_GREEN);
             delay(1500);
             return true;
