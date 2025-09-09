@@ -15,6 +15,7 @@
 #include "Watchface.h" // <-- ADDED
 #include "MQTT.h"
 #include "MusicMenuLite.h"
+#include "space_menu.h" // <-- ADDED
 #include <TFT_eSPI.h>
 // --- Layout Configuration ---
 // Change these values to adjust the menu layout
@@ -45,10 +46,11 @@ const MenuItem menuItems[] = {
     {"Pomodoro", tomato, &PomodoroMenu},
     {"Stopwatch", Timer, &StopwatchMenu},
     {"Music", Music, &BuzzerMenu},
-    {"Music Lite", Music, &MusicMenuLite},
+    {"Music Lite", music_lite, &MusicMenuLite},
+    {"Space",Space_img,&SpaceMenuScreen}, // Placeholder icon
     {"Performance", Performance, &performanceMenu},
     {"Temperature",Temperature, &DS18B20Menu},
-    {"Animation",LED, &AnimationMenu},
+    {"Animation",Animation, &AnimationMenu},
     {"Games", Games, &GamesMenu},
     {"LED", LED, &LEDMenu},
     {"ADC", ADC, &ADCMenu},

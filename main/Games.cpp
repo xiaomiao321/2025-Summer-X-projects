@@ -114,9 +114,9 @@ struct GameItem {
 
 // Game list with placeholder icons and function pointers
 const GameItem gameItems[] = {
-    {"Conway's Game", bird_big, ConwayGame},
+    {"Conway's Game", Conway, ConwayGame},
     // {"Snake Game", snake, tanchisheGame},
-    {"Buzzer Tap", bird_big, BuzzerTapGame},
+    // {"Buzzer Tap", bird_big, BuzzerTapGame},
     {"Time Challenge", Timer, TimeChallengeGame},
     {"Flappy Bird", bird_big, flappy_bird_game}, // Using Dinasor icon as placeholder
     // {"Dino Game", Dinasor, dinoGame}, // Placeholder icon
