@@ -5,6 +5,17 @@
 #include "Menu.h"    // For menuSprite
 #include <EEPROM.h>
 
+// --- UI Colors ---
+#define TARGET_HIGHLIGHT_COLOR      TFT_YELLOW
+#define TARGET_SAVE_COLOR           TFT_GREEN
+#define TARGET_CANCEL_COLOR         TFT_RED
+
+#define TARGET_PROGRESS_BAR_DATE_COLOR      TFT_YELLOW
+#define TARGET_COUNTDOWN_COLOR              TFT_SKYBLUE
+#define TARGET_TEXT_COLOR           TFT_GREENYELLOW
+#define TARGET_PROGRESS_BAR_OUTLINE_COLOR   TFT_WHITE
+#define TARGET_PROGRESS_BAR_FILL_COLOR      TFT_GREEN
+
 // --- Module-internal State ---
 static time_t countdownTarget;
 static ProgressBarInfo progressBar;
@@ -135,7 +146,7 @@ void drawTargetElements(TFT_eSprite* sprite) {
     strftime(buffer, sizeof(buffer), "%Y-%m-%d", &time_info);
     String end_str = buffer;
     snprintf(buffer, sizeof(buffer), "%s -> %s", start_str.c_str(), end_str.c_str());
-    sprite->setTextColor(TFT_WHITE, TFT_BLACK);
+    sprite->setTextColor(TARGET_PROGRESS_BAR_DATE_COLOR, TFT_BLACK);
     sprite->drawString(buffer, 120, y_base);
 
     // --- 2. Determine conditional elements ---
@@ -153,7 +164,7 @@ void drawTargetElements(TFT_eSprite* sprite) {
         int seconds = fmod(diff_seconds, 60);
 
         snprintf(buffer, sizeof(buffer), "%s%d-%02d:%02d:%02d", countdown_prefix, days, hours, minutes, seconds);
-        sprite->setTextColor(TFT_CYAN, TFT_BLACK);
+        sprite->setTextColor(TARGET_COUNTDOWN_COLOR, TFT_BLACK);
         sprite->drawString(buffer, 120, y_base + line_height);
     }
 
@@ -171,7 +182,7 @@ void drawTargetElements(TFT_eSprite* sprite) {
 
         // Draw Title & Percentage (with 4 decimal places)
         snprintf(buffer, sizeof(buffer), "%s: %.4f%%", progressBar.title, progress * 100.0f);
-        sprite->setTextColor(TFT_WHITE, TFT_BLACK);
+        sprite->setTextColor(TARGET_TEXT_COLOR, TFT_BLACK);
         sprite->drawString(buffer, 120, y_base + line_height * 2);
 
         // Draw Bar and Icons (Bar is wider now)
@@ -182,8 +193,8 @@ void drawTargetElements(TFT_eSprite* sprite) {
         int icon_size = 16;
         int icon_y = bar_y - ((icon_size - bar_h) / 2);
 
-        sprite->drawRoundRect(bar_x, bar_y, bar_w, bar_h, 4, TFT_DARKGREY);
-        sprite->fillRoundRect(bar_x + 1, bar_y + 1, (bar_w - 2) * progress, bar_h - 2, 3, TFT_GREEN);
+        sprite->drawRoundRect(bar_x, bar_y, bar_w, bar_h, 4, TARGET_PROGRESS_BAR_OUTLINE_COLOR);
+        sprite->fillRoundRect(bar_x + 1, bar_y + 1, (bar_w - 2) * progress, bar_h - 2, 3, TARGET_PROGRESS_BAR_FILL_COLOR);
 
         // Draw conditional icons
         if (isSemester) {
@@ -241,7 +252,7 @@ void TargetSettings_Menu() {
         menuSprite.setTextFont(1);
         menuSprite.setTextSize(2);
         for (int i = 0; i < numItems; i++) {
-            menuSprite.setTextColor(i == selectedIndex ? TFT_YELLOW : TFT_WHITE, TFT_BLACK);
+            menuSprite.setTextColor(i == selectedIndex ? TARGET_HIGHLIGHT_COLOR : TARGET_TEXT_COLOR, TFT_BLACK);
             menuSprite.drawString(mainMenuItems[i], 120, 60 + i * 30);
         }
         menuSprite.pushSprite(0, 0);
@@ -281,10 +292,10 @@ static void selectTitleMenu() {
         menuSprite.setTextDatum(MC_DATUM);
         menuSprite.setTextFont(1);
         menuSprite.setTextSize(2);
-        menuSprite.setTextColor(TFT_WHITE);
+        menuSprite.setTextColor(TARGET_TEXT_COLOR);
         menuSprite.drawString("Select Title", 120, 30);
         for (int i = 0; i < num_predefined_titles; i++) {
-            menuSprite.setTextColor(i == selectedIndex ? TFT_YELLOW : TFT_WHITE, TFT_BLACK);
+            menuSprite.setTextColor(i == selectedIndex ? TARGET_HIGHLIGHT_COLOR : TARGET_TEXT_COLOR, TFT_BLACK);
             menuSprite.drawString(predefined_titles[i], 120, 80 + i * 30);
         }
         menuSprite.pushSprite(0, 0);
@@ -370,7 +381,7 @@ static void drawEditScreen(const tm& time, EditMode mode, const char* menuTitle)
     menuSprite.setTextDatum(MC_DATUM);
     menuSprite.setTextFont(1);
     menuSprite.setTextSize(2);
-    menuSprite.setTextColor(TFT_WHITE);
+    menuSprite.setTextColor(TARGET_TEXT_COLOR);
     menuSprite.drawString(menuTitle, 120, 20);
 
     char buf[30];
@@ -378,25 +389,25 @@ static void drawEditScreen(const tm& time, EditMode mode, const char* menuTitle)
     snprintf(buf, sizeof(buf), "%d-%02d-%02d", time.tm_year + 1900, time.tm_mon + 1, time.tm_mday);
     menuSprite.setTextFont(4); menuSprite.setTextSize(1);
     menuSprite.drawString(buf, 120, 80);
-    if (mode == EditMode::YEAR) menuSprite.fillRect(30, 105, 70, 3, TFT_YELLOW);
-    if (mode == EditMode::MONTH) menuSprite.fillRect(110, 105, 45, 3, TFT_YELLOW);
-    if (mode == EditMode::DAY) menuSprite.fillRect(165, 105, 45, 3, TFT_YELLOW);
+    if (mode == EditMode::YEAR) menuSprite.fillRect(30, 105, 70, 3, TARGET_HIGHLIGHT_COLOR);
+    if (mode == EditMode::MONTH) menuSprite.fillRect(110, 105, 45, 3, TARGET_HIGHLIGHT_COLOR);
+    if (mode == EditMode::DAY) menuSprite.fillRect(165, 105, 45, 3, TARGET_HIGHLIGHT_COLOR);
 
     snprintf(buf, sizeof(buf), "%02d:%02d:%02d", time.tm_hour, time.tm_min, time.tm_sec);
     menuSprite.setTextFont(4); menuSprite.setTextSize(1);
     menuSprite.drawString(buf, 120, 140);
-    if (mode == EditMode::HOUR) menuSprite.fillRect(55, 165, 45, 3, TFT_YELLOW);
-    if (mode == EditMode::MINUTE) menuSprite.fillRect(110, 165, 45, 3, TFT_YELLOW);
-    if (mode == EditMode::SECOND) menuSprite.fillRect(165, 165, 45, 3, TFT_YELLOW);
+    if (mode == EditMode::HOUR) menuSprite.fillRect(55, 165, 45, 3, TARGET_HIGHLIGHT_COLOR);
+    if (mode == EditMode::MINUTE) menuSprite.fillRect(110, 165, 45, 3, TARGET_HIGHLIGHT_COLOR);
+    if (mode == EditMode::SECOND) menuSprite.fillRect(165, 165, 45, 3, TARGET_HIGHLIGHT_COLOR);
 
     menuSprite.setTextFont(1); menuSprite.setTextSize(2);
-    menuSprite.drawRoundRect(40, 200, 75, 30, 5, TFT_WHITE);
+    menuSprite.drawRoundRect(40, 200, 75, 30, 5, TARGET_TEXT_COLOR);
     menuSprite.drawString("SAVE", 78, 215);
-    if (mode == EditMode::SAVE) menuSprite.fillRoundRect(40, 200, 75, 30, 5, TFT_GREEN);
+    if (mode == EditMode::SAVE) menuSprite.fillRoundRect(40, 200, 75, 30, 5, TARGET_SAVE_COLOR);
 
-    menuSprite.drawRoundRect(125, 200, 75, 30, 5, TFT_WHITE);
+    menuSprite.drawRoundRect(125, 200, 75, 30, 5, TARGET_TEXT_COLOR);
     menuSprite.drawString("CANCEL", 163, 215);
-    if (mode == EditMode::CANCEL) menuSprite.fillRoundRect(125, 200, 75, 30, 5, TFT_RED);
+    if (mode == EditMode::CANCEL) menuSprite.fillRoundRect(125, 200, 75, 30, 5, TARGET_CANCEL_COLOR);
 
     menuSprite.pushSprite(0, 0);
 }

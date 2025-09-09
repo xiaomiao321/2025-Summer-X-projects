@@ -19,8 +19,17 @@
 // --- Time and Date Colors ---
 #define TIME_MAIN_COLOR     TFT_CYAN
 #define TIME_TENTH_COLOR    TFT_WHITE
-#define DATE_WEEKDAY_COLOR  TFT_WHITE
-#define DATE_DATE_COLOR     TFT_WHITE
+#define DATE_WEEKDAY_COLOR  TFT_YELLOW
+#define DATE_DATE_COLOR     TFT_YELLOW
+
+// --- Common Elements Colors ---
+#define WEATHER_DATA_COLOR          TFT_CYAN
+#define WEATHER_REPORT_TIME_COLOR   TFT_CYAN
+#define LAST_SYNC_TIME_COLOR        TFT_CYAN
+#define LAST_SYNC_WEATHER_COLOR     TFT_YELLOW
+#define DS18B20_TEMP_COLOR          TFT_ORANGE
+#define WIFI_CONNECTED_COLOR        TFT_GREEN
+#define WIFI_DISCONNECTED_COLOR     TFT_RED
 // =================================================================================================
 // Forward Declarations & Menu Setup
 // =================================================================================================
@@ -276,12 +285,25 @@ static void drawCommonElements() {
     // Weather (top right)
     menuSprite.setTextDatum(TR_DATUM);
     menuSprite.setTextSize(2);
-    menuSprite.setTextColor(TFT_ORANGE, TFT_BLACK);
+    menuSprite.setTextColor(WEATHER_DATA_COLOR, TFT_BLACK);
     String weatherStr = String(temperature) + " " + String(humidity);
     menuSprite.drawString(weatherStr, tft.width() - 15, 5);
-    menuSprite.setTextSize(1);
-    menuSprite.setTextDatum(TL_DATUM);
-    menuSprite.drawString(reporttime,5,5);
+    // Weather Report Time (HH:MM:SS)
+    char reportTimeOnlyStr[9]; // HH:MM:SS\0
+    // Assuming reporttime is a string like "YYYY-MM-DD HH:MM:SS"
+    // Extract the last 8 characters (HH:MM:SS)
+    int len = strlen(reporttime);
+    if (len >= 8) {
+        strncpy(reportTimeOnlyStr, reporttime + len - 8, 8);
+        reportTimeOnlyStr[8] = '\0';
+    } else {
+        // Handle cases where reporttime is shorter than expected
+        strncpy(reportTimeOnlyStr, "N/A", sizeof(reportTimeOnlyStr));
+    }
+    menuSprite.setTextSize(2); // Set text size to 2
+    menuSprite.setTextDatum(TL_DATUM); // Top-Left datum
+    menuSprite.setTextColor(WEATHER_REPORT_TIME_COLOR, TFT_BLACK); // Set a suitable color, e.g., white
+    menuSprite.drawString(reportTimeOnlyStr, 0, 5); // Draw from x=0
 
     // Date & Day of Week (Centered, two lines)
     menuSprite.setTextDatum(MC_DATUM);
@@ -302,13 +324,13 @@ static void drawCommonElements() {
     // Last Sync Time (bottom center)
     menuSprite.setTextDatum(BC_DATUM);
     menuSprite.setTextSize(1);
-    menuSprite.setTextColor(TFT_CYAN, TFT_BLACK);
+    menuSprite.setTextColor(LAST_SYNC_TIME_COLOR, TFT_BLACK);
     menuSprite.drawString(lastSyncTimeStr, 120, tft.height() - 5);
 
     // Last Sync Weather
     menuSprite.setTextDatum(BC_DATUM);
     menuSprite.setTextSize(1);
-    menuSprite.setTextColor(TFT_YELLOW, TFT_BLACK);
+    menuSprite.setTextColor(LAST_SYNC_WEATHER_COLOR, TFT_BLACK);
     menuSprite.drawString(lastWeatherSyncStr, 120, tft.height()-15);
 
     // DS18B20 Temperature
@@ -317,7 +339,7 @@ static void drawCommonElements() {
     menuSprite.setTextSize(1);
     float temp = getDS18B20Temp();
     String tempStr = "DS18B20: " + String(temp, 1) + " C";
-    menuSprite.setTextColor(TFT_WHITE, TFT_BLACK);
+    menuSprite.setTextColor(DS18B20_TEMP_COLOR, TFT_BLACK);
     menuSprite.drawString(tempStr, 120, tft.height() - 35);
 
     // WiFi Status
@@ -325,11 +347,11 @@ static void drawCommonElements() {
     menuSprite.setTextSize(1);
     if(ensureWiFiConnected())
     {
-        menuSprite.setTextColor(TFT_GREEN, TFT_BLACK); // White for general status
+        menuSprite.setTextColor(WIFI_CONNECTED_COLOR, TFT_BLACK); // White for general status
     }
     else
     {
-        menuSprite.setTextColor(TFT_RED,TFT_BLACK);
+        menuSprite.setTextColor(WIFI_DISCONNECTED_COLOR,TFT_BLACK);
     }
     menuSprite.drawString(wifiStatusStr, 120, tft.height()-25); // 10 pixels above lastWeatherSyncStr
     menuSprite.setTextColor(TIME_MAIN_COLOR,TFT_BLACK);
@@ -555,7 +577,7 @@ static void Cube3DWatchface() {
         menuSprite.setTextDatum(TC_DATUM);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, 5);
+        menuSprite.drawString(timeStr, tft.width()/2, 15);
 
 
         menuSprite.pushSprite(0, 0);
@@ -668,7 +690,7 @@ static void GalaxyWatchface() {
         menuSprite.setTextDatum(TC_DATUM);
         menuSprite.setTextSize(4);
         menuSprite.setTextColor(TIME_MAIN_COLOR, TFT_BLACK);
-        menuSprite.drawString(timeStr, tft.width()/2, 5);
+        menuSprite.drawString(timeStr, tft.width()/2, 15);
 
 
         menuSprite.pushSprite(0, 0);
@@ -1152,7 +1174,7 @@ static void SimpleClockWatchface() {
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = (tft.height() - timeHeight)/2;
+        int timeY = (tft.height() - timeHeight)/2 + 10;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1230,7 +1252,7 @@ static void shared_rain_logic(uint16_t color) {
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = (tft.height() - timeHeight)/2;
+        int timeY = (tft.height() - timeHeight)/2 + 10;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1300,7 +1322,7 @@ static void SnowWatchface() {
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = (tft.height() - timeHeight)/2;
+        int timeY = (tft.height() - timeHeight)/2 + 10;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1366,7 +1388,7 @@ static void WavesWatchface() {
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = (tft.height() - timeHeight)/2;
+        int timeY = (tft.height() - timeHeight)/2 + 10;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1431,7 +1453,7 @@ static void NenoWatchface() {
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = (tft.height() - timeHeight)/2;
+        int timeY = (tft.height() - timeHeight)/2 + 10;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1506,7 +1528,7 @@ static void BallsWatchface() {
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = (tft.height() - timeHeight)/2;
+        int timeY = (tft.height() - timeHeight)/2 + 10;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1585,7 +1607,7 @@ static void SandBoxWatchface() {
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeHeight = menuSprite.fontHeight();
         int timeX = tft.width()/2;
-        int timeY = (tft.height() - timeHeight)/2;
+        int timeY = (tft.height() - timeHeight)/2 + 10;
         menuSprite.drawString(timeStr, timeX, timeY);
 
         // Draw 0.1s digit
@@ -1647,7 +1669,7 @@ static void ProgressBarWatchface() {
         
         int timeWidth = menuSprite.textWidth(timeStr);
         int timeX = tft.width()/2;
-        int timeY = 115;
+        int timeY = 125;
         menuSprite.drawString(timeStr, timeX, timeY); // Y-pos below the new date
 
         // Draw 0.1s digit

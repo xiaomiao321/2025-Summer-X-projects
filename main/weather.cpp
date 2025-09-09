@@ -476,7 +476,7 @@ void syncTime() {
         }
         attempts++;
     }
-
+    tftClearLog();
     tftLog("========= Result =========",TFT_YELLOW);
     Serial.printf("\n=== Sync Result ===");
 
