@@ -73,7 +73,7 @@ String httpGETRequest(const char* url, int maxRetries = 5) {
 
         // 检查是否是 HTTP URL
         if (strncmp(url, "http://", 7) != 0) {
-            sprintf(log_buffer, "URL invalid: %s", url);
+            snprintf(log_buffer, sizeof(log_buffer), "URL invalid: %s", url);
             tftLog(log_buffer, TFT_RED);
             delay(500);
             continue;
@@ -106,11 +106,11 @@ String httpGETRequest(const char* url, int maxRetries = 5) {
                     http.end();
                     break;
                 } else {
-                    sprintf(log_buffer, "Error: %s", http.errorToString(httpCode).c_str());
+                    snprintf(log_buffer, sizeof(log_buffer), "Error: %s", http.errorToString(httpCode).c_str());
                     tftLog(log_buffer, TFT_RED);
                 }
             } else {
-                sprintf(log_buffer, "Failed: %s", http.errorToString(httpCode).c_str());
+                snprintf(log_buffer, sizeof(log_buffer), "Failed: %s", http.errorToString(httpCode).c_str());
                 tftLog(log_buffer, TFT_RED);
             }
 
@@ -212,14 +212,25 @@ void fetchShici() {
     String url = String(SHICI_API_URL) + INTERNET_API_KEY;
     String payload = httpGETRequest(url.c_str());
     if (payload.length() > 0) {
-        DynamicJsonDocument doc(1024);
+        DynamicJsonDocument doc(4096); // Increased capacity for full poem
         DeserializationError error = deserializeJson(doc, payload);
         if (!error) {
             g_shici_data.content = doc["data"]["content"].as<String>();
             g_shici_data.author = doc["data"]["origin"]["author"].as<String>();
             g_shici_data.dynasty = doc["data"]["origin"]["dynasty"].as<String>();
+            g_shici_data.title = doc["data"]["origin"]["title"].as<String>();
+            g_shici_data.popularity = doc["data"]["popularity"].as<int>();
+
+            // Concatenate the full poem content from the array
+            g_shici_data.full_content = "";
+            JsonArray full_content_array = doc["data"]["origin"]["content"].as<JsonArray>();
+            for (JsonVariant line : full_content_array) {
+                g_shici_data.full_content += line.as<String>();
+                g_shici_data.full_content += "\n"; // Use newline as separator
+            }
+
             tftLogInfo("Shici fetched.");
-            Serial.println("Shici: " + g_shici_data.content + " --" + g_shici_data.author + " [" + g_shici_data.dynasty + "]");
+            Serial.println("Shici: " + g_shici_data.title + " --" + g_shici_data.author);
         } else {
             tftLogError("Shici JSON error: " + String(error.c_str()));
         }
@@ -292,6 +303,7 @@ void fetchRandomEnWord() {
 // --- Internet Menu Core Functions ---
 
 void internet_menu_init() {
+    tftClearLog();
     tftLogInfo("Initializing Internet Menu...");
     tft.fillScreen(TFT_BLACK);
     tft.setTextDatum(MC_DATUM);
@@ -347,48 +359,14 @@ void internet_menu_init() {
     internet_menu_draw(); // Draw the first page
 }
 
-void internet_menu_loop() {
-    // This function is called repeatedly while the Internet menu is active
-    int rotation = readEncoder();
-    bool button_clicked = readButton();
-    bool long_press = readButtonLongPress();
 
-    if (rotation != 0) {
-        if (rotation > 0) {
-            internet_menu_next_page();
-        } else {
-            internet_menu_prev_page();
-        }
-        internet_menu_draw(); // Redraw on page change
-    }
-
-    if (button_clicked) {
-        // Re-fetch data for the current page
-        tftClearLog();
-        tftLogInfo("Re-fetching data for current page...");
-        switch (g_current_internet_page) {
-            case 0: fetchHealthTip(); break;
-            case 1: fetchSayLove(); break;
-            case 2: fetchEverydayEnglish(); break;
-            case 3: fetchFortune(); break;
-            case 4: fetchShici(); break;
-            case 5: fetchDuilian(); break;
-            case 6: fetchFxRate(); break;
-            case 7: fetchRandomEnWord(); break;
-        }
-        internet_menu_draw(); // Redraw with new data
-    }
-
-    if (long_press) {
-        internet_menu_back_press();
-        // The calling loop in Menu.cpp will break out after this
-    }
-}
 
 // Helper function to draw wrapped text on a sprite
 void drawWrappedText(TFT_eSprite &sprite, String text, int x, int y, int maxWidth, int font, uint16_t color) {
     sprite.setTextColor(color);
-    sprite.setTextFont(font);
+    if (font > 0) {
+        sprite.setTextFont(font);
+    }
     sprite.setTextWrap(true); // Enable text wrapping
     sprite.setCursor(x, y);   // Set the starting cursor position
     sprite.print(text);       // Print the text, it will wrap automatically
@@ -420,11 +398,10 @@ void internet_menu_draw() {
             menuSprite.setTextSize(2);
             menuSprite.setTextColor(TFT_CYAN);
             menuSprite.drawString("Health Tip:", 5, 25);
-            
             // Content (Chinese)
-            menuSprite.loadFont(font_12);
-            drawWrappedText(menuSprite, g_health_tip_data.content, content_x, content_y, content_width, 0, TFT_WHITE);
-            menuSprite.unloadFont();
+            // menuSprite.loadFont(font_12);
+            // drawWrappedText(menuSprite, g_health_tip_data.content, content_x, content_y, content_width, 0, TFT_WHITE);
+            // menuSprite.unloadFont();
             break;
         case 1: // Say Love
             // Title (English)
@@ -432,9 +409,10 @@ void internet_menu_draw() {
             menuSprite.setTextSize(2);
             menuSprite.setTextColor(TFT_PINK);
             menuSprite.drawString("Love Talk:", 5, 25);
-
+            Serial.println("About to load font");
             // Content (Chinese)
             menuSprite.loadFont(font_12);
+            Serial.println("Font loaded");
             drawWrappedText(menuSprite, g_say_love_data.content, content_x, content_y, content_width, 0, TFT_WHITE);
             menuSprite.unloadFont();
             break;
@@ -449,7 +427,7 @@ void internet_menu_draw() {
             menuSprite.setTextFont(1);
             menuSprite.setTextSize(2);
             drawWrappedText(menuSprite, g_everyday_english_data.content, content_x, content_y, content_width, english_font_num, TFT_WHITE);
-            content_y = menuSprite.getCursorY() + 10;
+            content_y = menuSprite.getCursorY() + 20;
 
             // Note (Chinese)
             menuSprite.loadFont(font_12);
@@ -466,49 +444,60 @@ void internet_menu_draw() {
             if (g_fortune_data.success) {
                 menuSprite.loadFont(font_12);
                 drawWrappedText(menuSprite, "Sign: " + g_fortune_data.sign, content_x, content_y, content_width, 0, TFT_WHITE);
-                content_y = menuSprite.getCursorY() + 5;
+                content_y = menuSprite.getCursorY() + 15;
                 drawWrappedText(menuSprite, "Desc: " + g_fortune_data.description, content_x, content_y, content_width, 0, TFT_WHITE);
-                content_y = menuSprite.getCursorY() + 5;
+                content_y = menuSprite.getCursorY() + 15;
                 drawWrappedText(menuSprite, "Color: " + g_fortune_data.luckyColor, content_x, content_y, content_width, 0, TFT_WHITE);
                 menuSprite.unloadFont();
                 
-                content_y = menuSprite.getCursorY() + 5;
+                content_y = menuSprite.getCursorY() + 15;
                 
                 menuSprite.setTextFont(1);
                 menuSprite.setTextSize(2);
                 drawWrappedText(menuSprite, "Num: " + String(g_fortune_data.luckyNumber), content_x, content_y, content_width, english_font_num, TFT_WHITE);
             } else {
                 menuSprite.loadFont(font_12);
-                drawWrappedText(menuSprite, "Error: " + g_fortune_data.message, content_x, content_y, content_width, 0, TFT_WHITE);
-                content_y = menuSprite.getCursorY() + 5;
-                drawWrappedText(menuSprite, "Sign: " + g_fortune_data.sign, content_x, content_y, content_width, 0, TFT_WHITE);
-                content_y = menuSprite.getCursorY() + 5;
-                drawWrappedText(menuSprite, "Desc: " + g_fortune_data.description, content_x, content_y, content_width, 0, TFT_WHITE);
-                content_y = menuSprite.getCursorY() + 5;
+                drawWrappedText(menuSprite, g_fortune_data.message, content_x, content_y, content_width, 0, TFT_WHITE);
+                content_y = menuSprite.getCursorY() + 15;
+                drawWrappedText(menuSprite, "概述" + g_fortune_data.sign, content_x, content_y, content_width, 0, TFT_WHITE);
+                content_y = menuSprite.getCursorY() + 15;
+                drawWrappedText(menuSprite, "详细" + g_fortune_data.description, content_x, content_y, content_width, 0, TFT_WHITE);
+                content_y = menuSprite.getCursorY() + 15;
                 drawWrappedText(menuSprite, "Color: " + g_fortune_data.luckyColor, content_x, content_y, content_width, 0, TFT_WHITE);
                 menuSprite.unloadFont();
 
-                content_y = menuSprite.getCursorY() + 5;
+                content_y = menuSprite.getCursorY() + 15;
                 menuSprite.setTextFont(1);
                 menuSprite.setTextSize(2);
                 drawWrappedText(menuSprite, "Num: " + String(g_fortune_data.luckyNumber), content_x, content_y, content_width, english_font_num, TFT_WHITE);
             }
             break;
         case 4: // Shici (Poem)
-            // Title (English)
+        {
+            // Title, Author, Dynasty
+            menuSprite.loadFont(font_12);
+            menuSprite.setTextColor(TFT_CYAN, TFT_BLACK);
+            menuSprite.setTextDatum(MC_DATUM);
+            menuSprite.drawString(g_shici_data.title, menuSprite.width() / 2, 20);
+            
+            menuSprite.setTextColor(TFT_YELLOW, TFT_BLACK);
+            String author_info = g_shici_data.author + " [" + g_shici_data.dynasty + "]";
+            menuSprite.drawString(author_info, menuSprite.width() / 2, 45);
+            menuSprite.unloadFont();
+
+            // Popularity (using built-in font)
             menuSprite.setTextFont(1);
             menuSprite.setTextSize(2);
-            menuSprite.setTextColor(TFT_MAGENTA);
-            menuSprite.drawString("Daily Poem:", 5, 25);
+            menuSprite.setTextColor(TFT_ORANGE, TFT_BLACK);
+            menuSprite.setTextDatum(TR_DATUM);
+            menuSprite.drawString("Pop: " + String(g_shici_data.popularity), menuSprite.width() - 5, 5);
+            menuSprite.setTextDatum(TL_DATUM); // Reset datum
 
-            // Content (Chinese)
+            // Full Poem Content
             menuSprite.loadFont(font_12);
-            drawWrappedText(menuSprite, g_shici_data.content, content_x, content_y, content_width, 0, TFT_WHITE);
-            content_y = menuSprite.getCursorY() + 10;
-            drawWrappedText(menuSprite, "Author: " + g_shici_data.author, content_x, content_y, content_width, 0, TFT_YELLOW);
-            content_y = menuSprite.getCursorY() + 10;
-            drawWrappedText(menuSprite, "Dynasty: " + g_shici_data.dynasty, content_x, content_y, content_width, 0, TFT_YELLOW);
+            drawWrappedText(menuSprite, g_shici_data.full_content, content_x, 70, content_width, 0, TFT_WHITE);
             menuSprite.unloadFont();
+        }
             break;
         case 5: // Duilian (Couplet)
             // Title (English)
@@ -526,13 +515,17 @@ void internet_menu_draw() {
             // Title (English)
             menuSprite.setTextFont(1);
             menuSprite.setTextSize(2);
+            menuSprite.setTextDatum(TC_DATUM);
             menuSprite.setTextColor(TFT_GREENYELLOW);
-            menuSprite.drawString("USD to CNY (1 USD):", 5, 25);
+            menuSprite.drawString("USD to CNY (1 USD):", 120, 5);
 
             // Content (English)
+            menuSprite.setTextFont(7);
+            menuSprite.setTextSize(1);
+            menuSprite.setTextDatum(MC_DATUM);
+            menuSprite.drawString(g_fx_rate_data.money, 120, 120);
             menuSprite.setTextFont(1);
             menuSprite.setTextSize(2);
-            drawWrappedText(menuSprite, g_fx_rate_data.money + " CNY", content_x, content_y, content_width, english_font_num, TFT_WHITE);
             break;
         case 7: // Random English Word
             // Title (English)
@@ -545,28 +538,28 @@ void internet_menu_draw() {
             menuSprite.setTextFont(1);
             menuSprite.setTextSize(2);
             drawWrappedText(menuSprite, "Word: " + g_random_en_word_data.headWord, content_x, content_y, content_width, english_font_num, TFT_WHITE);
-            content_y = menuSprite.getCursorY() + 10;
+            content_y = menuSprite.getCursorY() + 15;
 
             // Trans (Chinese)
             menuSprite.loadFont(font_12);
-            drawWrappedText(menuSprite, "Trans: " + g_random_en_word_data.tranCn, content_x, content_y, content_width, 0, TFT_WHITE);
+            drawWrappedText(menuSprite, "翻译: " + g_random_en_word_data.tranCn, content_x, content_y, content_width, 0, TFT_WHITE);
             menuSprite.unloadFont();
 
             if (g_random_en_word_data.phrases_en.length() > 0) {
-                content_y = menuSprite.getCursorY() + 10;
+                content_y = menuSprite.getCursorY() + 15;
                 
                 // Phrases title (English)
                 menuSprite.setTextFont(1);
                 menuSprite.setTextSize(2);
                 menuSprite.setTextColor(TFT_CYAN);
                 menuSprite.drawString("Phrases:", content_x, content_y);
-                content_y = menuSprite.getCursorY() + 10;
+                content_y = menuSprite.getCursorY() + 15;
 
                 // English phrases
                 menuSprite.setTextFont(1);
                 menuSprite.setTextSize(2);
                 drawWrappedText(menuSprite, g_random_en_word_data.phrases_en, content_x, content_y, content_width, english_font_num, TFT_WHITE);
-                content_y = menuSprite.getCursorY() + 10;
+                content_y = menuSprite.getCursorY() + 15;
 
                 // Chinese phrases
                 menuSprite.loadFont(font_12);
@@ -595,10 +588,42 @@ bool internet_menu_back_press() {
 // New function to encapsulate internet_menu_init and the main loop
 void InternetMenuScreen() {
     internet_menu_init(); // Initialize the Internet menu
-    while (1) { // internet_menu_back_press() will be true on long press
-        internet_menu_loop();
-        internet_menu_draw();
-        if (readButtonLongPress()) { return; }
+    while (true) {
+        int rotation = readEncoder();
+        bool button_clicked = readButton();
+        bool long_press = readButtonLongPress();
+
+        if (long_press) {
+            internet_menu_back_press();
+            return;
+        }
+
+        if (rotation != 0) {
+            if (rotation > 0) {
+                internet_menu_next_page();
+            } else {
+                internet_menu_prev_page();
+            }
+            internet_menu_draw(); // Redraw on page change
+        }
+
+        if (button_clicked) {
+            // Re-fetch data for the current page
+            tftClearLog();
+            tftLogInfo("Re-fetching data for current page...");
+            switch (g_current_internet_page) {
+                case 0: fetchHealthTip(); break;
+                case 1: fetchSayLove(); break;
+                case 2: fetchEverydayEnglish(); break;
+                case 3: fetchFortune(); break;
+                case 4: fetchShici(); break;
+                case 5: fetchDuilian(); break;
+                case 6: fetchFxRate(); break;
+                case 7: fetchRandomEnWord(); break;
+            }
+            internet_menu_draw(); // Redraw with new data
+        }
+
         vTaskDelay(pdMS_TO_TICKS(10)); // Small delay to prevent busy-waiting
     }
     // No need to call showMenuConfig() here, Menu.cpp will handle returning to main menu

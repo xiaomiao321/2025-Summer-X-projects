@@ -315,7 +315,7 @@ void fastTypeWriter(const char* text, int x, int y, uint32_t color = TFT_WHITE, 
 
 // 清空日志区域
 void tftClearLog() {
-    tft.fillRect(0, 30, tft.width(), tft.height() - 30, TFT_BLACK);
+    tft.fillRect(0, 10, tft.width(), tft.height() - 30, TFT_BLACK);
     tft_log_y = 40;
     current_log_lines = 0;
 }

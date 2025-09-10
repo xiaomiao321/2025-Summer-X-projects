@@ -37,6 +37,9 @@ struct ShiciData {
     String content;
     String author;
     String dynasty;
+    String title;
+    String full_content;
+    int popularity;
 };
 
 struct DuilianData {

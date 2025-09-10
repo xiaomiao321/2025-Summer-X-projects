@@ -40,30 +40,57 @@ uint8_t picture_flag = 0;           // Current selected menu item index
 
 
 // Menu items array
+// const MenuItem menuItems[] = {
+//     {"Clock", Weather, &weatherMenu},
+//     {"Countdown", Countdown, &CountdownMenu},
+//     {"Alarm", alarm_img, &AlarmMenu}, // Added Alarm Menu
+//     {"Pomodoro", tomato, &PomodoroMenu},
+//     {"Stopwatch", Timer, &StopwatchMenu},
+//     {"Music", Music, &BuzzerMenu},
+//     {"Music Lite", music_lite, &MusicMenuLite},
+//     {"Space",Space_img,&SpaceMenuScreen}, // Placeholder icon
+//     {"Internet", Internet, &InternetMenuScreen}, // New Internet menu
+//     {"Performance", Performance, &performanceMenu},
+//     {"Temperature",Temperature, &DS18B20Menu},
+//     {"Animation",Animation, &AnimationMenu},
+//     {"Games", Games, &GamesMenu},
+//     {"LED", LED, &LEDMenu},
+//     {"ADC", ADC, &ADCMenu},
+// };
 const MenuItem menuItems[] = {
     {"Clock", Weather, &weatherMenu},
-    // {"Countdown", Countdown, &CountdownMenu},
-    {"Countdown", Countdown, &CountdownMenu},
-    // {"Alarm", alarm_img, &AlarmMenu}, // Added Alarm Menu
+    {"Countdown", Timer, &CountdownMenu},
     {"Alarm", alarm_img, &AlarmMenu}, // Added Alarm Menu
-    // {"Pomodoro", tomato, &PomodoroMenu},
-    {"Pomodoro", Timer, &PomodoroMenu},
+    {"Pomodoro", tomato, &PomodoroMenu},
     {"Stopwatch", Timer, &StopwatchMenu},
     {"Music", Music, &BuzzerMenu},
-    // {"Music Lite", music_lite, &MusicMenuLite},
-    {"Music Lite", Music, &MusicMenuLite},
-    //{"Space",Space_img,&SpaceMenuScreen}, 
-    {"Space",Internet,&SpaceMenuScreen},
+    {"Music Lite", music_lite, &MusicMenuLite},
+    {"Space",Space_img,&SpaceMenuScreen}, // Placeholder icon
     {"Internet", Internet, &InternetMenuScreen}, // New Internet menu
     {"Performance", Performance, &performanceMenu},
-    // {"Temperature",Temperature, &DS18B20Menu},
-    {"Temperature",ADC, &DS18B20Menu},
-    // {"Animation",Animation, &AnimationMenu},
-    {"Animation",LED, &AnimationMenu},
+    {"Temperature",Temperature, &DS18B20Menu},
+    {"Animation",Animation, &AnimationMenu},
     {"Games", Games, &GamesMenu},
     {"LED", LED, &LEDMenu},
     {"ADC", ADC, &ADCMenu},
 };
+// const MenuItem menuItems[] = {
+//     {"Clock", Weather, &weatherMenu},
+//     {"Countdown", tomato, &CountdownMenu},
+//     {"Alarm", tomato, &AlarmMenu}, // Added Alarm Menu
+//     {"Pomodoro", tomato, &PomodoroMenu},
+//     {"Stopwatch", tomato, &StopwatchMenu},
+//     {"Music", Music, &BuzzerMenu},
+//     {"Music Lite", Music, &MusicMenuLite},
+//     {"Space",tomato,&SpaceMenuScreen}, // Placeholder icon
+//     {"Internet", Internet, &InternetMenuScreen}, // New Internet menu
+//     {"Performance", tomato, &performanceMenu},
+//     {"Temperature",tomato, &DS18B20Menu},
+//     {"Animation",tomato, &AnimationMenu},
+//     {"Games", tomato, &GamesMenu},
+//     {"LED", tomato, &LEDMenu},
+//     {"ADC", tomato, &ADCMenu},
+// };
 const uint8_t MENU_ITEM_COUNT = sizeof(menuItems) / sizeof(menuItems[0]); // Number of menu items
 
 // Menu state enum

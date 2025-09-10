@@ -1,5 +1,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <LittleFS.h>
 
 #include "Menu.h"
 #include "System.h"
@@ -15,6 +16,12 @@
 
 void setup() {
     bootSystem();
+
+    if (!LittleFS.begin(true)) {
+        Serial.println("An error has occurred while mounting LittleFS");
+        return;
+    }
+    Serial.println("LittleFS mounted successfully");
     
     // Initialize MQTT, assuming WiFi is now connected
     // connectMQTT(); 
