@@ -4,6 +4,7 @@
 #include "RotaryEncoder.h"
 #include <TFT_eSPI.h>
 #include "img.h"
+#include "Internet.h" // Include for the new Internet menu
 
 // Menu item structure
 struct MenuItem {

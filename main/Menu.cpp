@@ -16,6 +16,7 @@
 #include "MQTT.h"
 #include "MusicMenuLite.h"
 #include "space_menu.h" // <-- ADDED
+#include "Internet.h" // Include for the new Internet menu
 #include <TFT_eSPI.h>
 // --- Layout Configuration ---
 // Change these values to adjust the menu layout
@@ -41,16 +42,24 @@ uint8_t picture_flag = 0;           // Current selected menu item index
 // Menu items array
 const MenuItem menuItems[] = {
     {"Clock", Weather, &weatherMenu},
+    // {"Countdown", Countdown, &CountdownMenu},
     {"Countdown", Countdown, &CountdownMenu},
+    // {"Alarm", alarm_img, &AlarmMenu}, // Added Alarm Menu
     {"Alarm", alarm_img, &AlarmMenu}, // Added Alarm Menu
-    {"Pomodoro", tomato, &PomodoroMenu},
+    // {"Pomodoro", tomato, &PomodoroMenu},
+    {"Pomodoro", Timer, &PomodoroMenu},
     {"Stopwatch", Timer, &StopwatchMenu},
     {"Music", Music, &BuzzerMenu},
-    {"Music Lite", music_lite, &MusicMenuLite},
-    {"Space",Space_img,&SpaceMenuScreen}, // Placeholder icon
+    // {"Music Lite", music_lite, &MusicMenuLite},
+    {"Music Lite", Music, &MusicMenuLite},
+    //{"Space",Space_img,&SpaceMenuScreen}, 
+    {"Space",Internet,&SpaceMenuScreen},
+    {"Internet", Internet, &InternetMenuScreen}, // New Internet menu
     {"Performance", Performance, &performanceMenu},
-    {"Temperature",Temperature, &DS18B20Menu},
-    {"Animation",Animation, &AnimationMenu},
+    // {"Temperature",Temperature, &DS18B20Menu},
+    {"Temperature",ADC, &DS18B20Menu},
+    // {"Animation",Animation, &AnimationMenu},
+    {"Animation",LED, &AnimationMenu},
     {"Games", Games, &GamesMenu},
     {"LED", LED, &LEDMenu},
     {"ADC", ADC, &ADCMenu},
@@ -173,6 +182,8 @@ void showMenu() {
 
         if (menuItems[picture_flag].action) {
             exitSubMenu = false; // ADD THIS LINE: Reset exitSubMenu before calling sub-menu
+            
+            // For all menus, call their action directly (now InternetMenuScreen() handles its own loop)
             menuItems[picture_flag].action();
             showMenuConfig();
         }
