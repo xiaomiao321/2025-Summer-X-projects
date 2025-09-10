@@ -11,9 +11,6 @@
 
 
 // Structs to hold parsed data from each API
-struct HealthTipData {
-    String content;
-};
 
 struct SayLoveData {
     String content;
@@ -56,9 +53,36 @@ struct RandomEnWordData {
     String phrases_en; // Concatenated phrases
     String phrases_cn; // Concatenated phrases
 };
+// 每日一言
+struct YiyanData {
+    String hitokoto;
+};
 
+// 励志古语
+struct LzmyData {
+    String saying;
+    String transl;
+    String source;
+};
+
+// 优美诗词
+struct VerseData {
+    String content;
+    String source;
+    String author;
+};
+
+// 天气诗词
+struct TianqishijuData {
+    String content;
+    String author;
+    String source;
+};
+  // 伤感语句
+struct HsjzData {
+    String content;
+};
 // Global data storage for Internet menu
-extern HealthTipData g_health_tip_data;
 extern SayLoveData g_say_love_data;
 extern EverydayEnglishData g_everyday_english_data;
 extern FortuneData g_fortune_data;

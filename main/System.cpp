@@ -315,7 +315,7 @@ void fastTypeWriter(const char* text, int x, int y, uint32_t color = TFT_WHITE, 
 
 // 清空日志区域
 void tftClearLog() {
-    tft.fillRect(0, 10, tft.width(), tft.height() - 30, TFT_BLACK);
+    tft.fillScreen(TFT_BLACK);
     tft_log_y = 40;
     current_log_lines = 0;
 }
@@ -323,7 +323,7 @@ void tftClearLog() {
 // 显示日志标题栏（快速打字机效果）
 void tftLogHeader(const String& title) {
     // 绘制标题栏背景
-    tft.fillRect(0, 0, tft.width(), 30, TFT_DARKGREEN);
+    tft.fillScreen(TFT_BLACK);
     
     // 绘制标题（快速打字机效果）
     tft.setTextSize(2);
