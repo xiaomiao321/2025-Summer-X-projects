@@ -29,6 +29,7 @@ const char* LZMY_API_URL = "http://whyta.cn/api/tx/lzmy?key=";
 const char* VERSE_API_URL = "http://whyta.cn/api/tx/verse?key=";
 const char* TIANQISHIJU_API_URL = "http://whyta.cn/api/tx/tianqishiju?key=";
 const char* HSJZ_API_URL = "http://whyta.cn/api/tx/hsjz?key=";
+const char* NAOWAN_API_URL = "http://whyta.cn/api/tx/naowan?key=";
 
 // Global data storage for Internet menu
 SayLoveData g_say_love_data;
@@ -43,10 +44,15 @@ LzmyData g_lzmy_data;
 VerseData g_verse_data;
 TianqishijuData g_tianqishiju_data;
 HsjzData g_hsjz_data;
+BrainTeaserData g_brain_teaser_data;
 
 // Internal variables for page management
 static int g_current_internet_page = 0;
-static const int MAX_INTERNET_PAGES = 11; // Updated page count
+static const int MAX_INTERNET_PAGES = 13; // Updated page count
+
+// Brain teaser page state
+static int g_brain_teaser_index = 0;
+static bool g_show_brain_teaser_answer = false;
 
 // --- Helper function for HTTP GET requests ---
 String httpGETRequest(const char* url, int maxRetries = 5) {
@@ -76,6 +82,7 @@ String httpGETRequest(const char* url, int maxRetries = 5) {
         sprintf(log_buffer, "HTTP Try %d/%d", i + 1, maxRetries);
         tftLog(log_buffer, TFT_YELLOW);
 
+        Serial.printf("Checking URL: '%s'\n", url);
         // 检查是否是 HTTP URL
         if (strncmp(url, "http://", 7) != 0) {
             snprintf(log_buffer, sizeof(log_buffer), "URL invalid: %s", url);
@@ -388,6 +395,32 @@ void fetchHsjz() {
 
 }
 
+void fetchBrainTeaser() {
+    String url = String(NAOWAN_API_URL) + INTERNET_API_KEY + "&num=3";
+    String payload = httpGETRequest(url.c_str());
+    if (payload.length() > 0) {
+        DynamicJsonDocument doc(2048);
+        DeserializationError error = deserializeJson(doc, payload);
+        if (!error && doc["code"] == 200) {
+            JsonArray list = doc["result"]["list"].as<JsonArray>();
+            g_brain_teaser_data.count = 0;
+            for (JsonObject item : list) {
+                if (g_brain_teaser_data.count < 3) {
+                    g_brain_teaser_data.teasers[g_brain_teaser_data.count].quest = item["quest"].as<String>();
+                    g_brain_teaser_data.teasers[g_brain_teaser_data.count].result = item["result"].as<String>();
+                    g_brain_teaser_data.count++;
+                }
+            }
+            g_brain_teaser_index = 0;
+            g_show_brain_teaser_answer = false;
+            tftLogInfo("Brain Teaser fetched.");
+            Serial.println("Brain Teaser fetched: " + String(g_brain_teaser_data.count) + " items.");
+        } else {
+            tftLogError("Brain Teaser JSON error or API error.");
+        }
+    }
+}
+
 // --- Internet Menu Core Functions ---
 
 void internet_menu_init() {
@@ -434,6 +467,7 @@ void internet_menu_init() {
     fetchLzmy();
     fetchVerse();
     fetchTianqishiju();
+    fetchBrainTeaser();
 
     tftLogInfo("Internet Menu Initialized.");
     g_current_internet_page = 0; // Start at the first page
@@ -522,7 +556,7 @@ void internet_menu_draw() {
             menuSprite.setTextColor(TFT_CYAN, TFT_BLACK);
             menuSprite.setTextDatum(MC_DATUM);
             menuSprite.drawString(g_shici_data.title, menuSprite.width() / 2, 20);
-            String author_info = g_shici_data.author + " " + g_shici_data.dynasty;
+            String author_info = g_shici_data.author + "[ " + g_shici_data.dynasty+"]";
             menuSprite.drawString(author_info, menuSprite.width() / 2, 45);
             menuSprite.unloadFont();
             menuSprite.setTextFont(1);
@@ -550,7 +584,7 @@ void internet_menu_draw() {
             menuSprite.setTextSize(2);
             menuSprite.setTextDatum(TC_DATUM);
             menuSprite.setTextColor(TFT_GREENYELLOW);
-            menuSprite.drawString("USD to CNY (1 USD):", 120, 5);
+            menuSprite.drawString("USD to CNY (1 USD)", 120, 25);
             menuSprite.setTextFont(7);
             menuSprite.setTextSize(1);
             menuSprite.setTextDatum(MC_DATUM);
@@ -562,13 +596,13 @@ void internet_menu_draw() {
             menuSprite.setTextFont(1);
             menuSprite.setTextSize(2);
             menuSprite.setTextColor(TFT_VIOLET);
-            menuSprite.drawString("Random Word:", 5, 25);
+            menuSprite.drawString("Random Word", 5, 25);
             menuSprite.setTextFont(1);
             menuSprite.setTextSize(2);
-            drawWrappedText(menuSprite, "Word: " + g_random_en_word_data.headWord, content_x, content_y, content_width, english_font_num, TFT_WHITE);
+            drawWrappedText(menuSprite, g_random_en_word_data.headWord, content_x, content_y, content_width, english_font_num, TFT_WHITE);
             content_y = menuSprite.getCursorY() + 15;
             menuSprite.loadFont(font_12);
-            drawWrappedText(menuSprite, "中文: " + g_random_en_word_data.tranCn, content_x, content_y, content_width, 0, TFT_WHITE);
+            drawWrappedText(menuSprite, g_random_en_word_data.tranCn, content_x, content_y, content_width, 0, TFT_WHITE);
             menuSprite.unloadFont();
             if (g_random_en_word_data.phrases_en.length() > 0) {
                 content_y = menuSprite.getCursorY() + 15;
@@ -611,7 +645,7 @@ void internet_menu_draw() {
             menuSprite.loadFont(font_12);
             drawWrappedText(menuSprite, g_verse_data.content, content_x, content_y, content_width, 0, TFT_WHITE);
             content_y = menuSprite.getCursorY() + 15;
-            drawWrappedText(menuSprite, g_verse_data.author + " " + g_verse_data.source + " ", content_x, content_y, content_width, 0, TFT_YELLOW);
+            drawWrappedText(menuSprite, g_verse_data.author + "《 " + g_verse_data.source + " 》", content_x, content_y, content_width, 0, TFT_YELLOW);
             menuSprite.unloadFont();
             break;
         case 10: // Tianqishiju
@@ -622,7 +656,7 @@ void internet_menu_draw() {
             menuSprite.loadFont(font_12);
             drawWrappedText(menuSprite, g_tianqishiju_data.content, content_x, content_y, content_width, 0, TFT_WHITE);
             content_y = menuSprite.getCursorY() + 15;
-            drawWrappedText(menuSprite, g_tianqishiju_data.author + " " + g_tianqishiju_data.source + " ", content_x, content_y, content_width, 0, TFT_YELLOW);
+            drawWrappedText(menuSprite, g_tianqishiju_data.author + "《 " + g_tianqishiju_data.source + " 》", content_x, content_y, content_width, 0, TFT_YELLOW);
             menuSprite.unloadFont();
             break;
         case 11: // Hsjz
@@ -631,7 +665,7 @@ void internet_menu_draw() {
 
             menuSprite.setTextSize(2);
 
-            menuSprite.setTextColor(TFT_DARKGREY);
+            menuSprite.setTextColor(TFT_WHITE);
 
             menuSprite.drawString("Sad Sentence:", 5, 25);
 
@@ -642,7 +676,25 @@ void internet_menu_draw() {
             menuSprite.unloadFont();
 
             break;
+        case 12: // Brain Teaser
+            menuSprite.setTextFont(1);
+            menuSprite.setTextSize(2);
+            menuSprite.setTextColor(TFT_MAGENTA);
+            menuSprite.drawString("Brain Teaser:", 5, 25);
+            menuSprite.loadFont(font_12);
+            if (g_brain_teaser_data.count > 0 && g_brain_teaser_index < g_brain_teaser_data.count) {
+                drawWrappedText(menuSprite, g_brain_teaser_data.teasers[g_brain_teaser_index].quest, content_x, content_y, content_width, 0, TFT_WHITE);
+                if (g_show_brain_teaser_answer) {
+                    content_y = menuSprite.getCursorY() + 15;
+                    drawWrappedText(menuSprite, g_brain_teaser_data.teasers[g_brain_teaser_index].result, content_x, content_y, content_width, 0, TFT_GREEN);
+                }
+            } else {
+                drawWrappedText(menuSprite, "Loading...", content_x, content_y, content_width, 0, TFT_WHITE);
+            }
+            menuSprite.unloadFont();
+            break;
 }
+
     menuSprite.pushSprite(0, 0); // Push sprite to screen
 }
 
@@ -681,24 +733,38 @@ void InternetMenuScreen() {
         }
 
         if (button_clicked) {
-            // Re-fetch data for the current page
-            tftClearLog();
-            tftLogInfo("Re-fetching data for current page...");
-            switch (g_current_internet_page) {
-                case 0: fetchSayLove(); break;
-                case 1: fetchEverydayEnglish(); break;
-                case 2: fetchFortune(); break;
-                case 3: fetchShici(); break;
-                case 4: fetchDuilian(); break;
-                case 5: fetchFxRate(); break;
-                case 6: fetchRandomEnWord(); break;
-                case 7: fetchYiyan(); break;
-                case 8: fetchLzmy(); break;
-                case 9: fetchVerse(); break;
-                case 10: fetchTianqishiju(); break;
-                case 11: fetchHsjz(); break;
+            if (g_current_internet_page == 12) { // Brain Teaser page
+                if (!g_show_brain_teaser_answer) {
+                    g_show_brain_teaser_answer = true;
+                } else {
+                    g_brain_teaser_index++;
+                    g_show_brain_teaser_answer = false;
+                    if (g_brain_teaser_index >= g_brain_teaser_data.count) {
+                        tftClearLog();
+                        tftLogInfo("Fetching new brain teasers...");
+                        fetchBrainTeaser(); // Refetch when all are shown
+                    }
+                }
+            } else {
+                // Re-fetch data for the current page
+                tftClearLog();
+                tftLogInfo("Re-fetching data for current page...");
+                switch (g_current_internet_page) {
+                    case 0: fetchSayLove(); break;
+                    case 1: fetchEverydayEnglish(); break;
+                    case 2: fetchFortune(); break;
+                    case 3: fetchShici(); break;
+                    case 4: fetchDuilian(); break;
+                    case 5: fetchFxRate(); break;
+                    case 6: fetchRandomEnWord(); break;
+                    case 7: fetchYiyan(); break;
+                    case 8: fetchLzmy(); break;
+                    case 9: fetchVerse(); break;
+                    case 10: fetchTianqishiju(); break;
+                    case 11: fetchHsjz(); break;
+                }
             }
-            internet_menu_draw(); // Redraw with new data
+            internet_menu_draw(); // Redraw with new data or state
         }
 
         vTaskDelay(pdMS_TO_TICKS(10)); // Small delay to prevent busy-waiting

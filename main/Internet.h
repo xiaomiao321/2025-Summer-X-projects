@@ -82,6 +82,18 @@ struct TianqishijuData {
 struct HsjzData {
     String content;
 };
+
+// 脑筋急转弯
+struct BrainTeaser {
+    String quest;
+    String result;
+};
+
+struct BrainTeaserData {
+    BrainTeaser teasers[3];
+    int count = 0;
+};
+
 // Global data storage for Internet menu
 extern SayLoveData g_say_love_data;
 extern EverydayEnglishData g_everyday_english_data;
@@ -90,6 +102,12 @@ extern ShiciData g_shici_data;
 extern DuilianData g_duilian_data;
 extern FxRateData g_fx_rate_data;
 extern RandomEnWordData g_random_en_word_data;
+extern YiyanData g_yiyan_data;
+extern LzmyData g_lzmy_data;
+extern VerseData g_verse_data;
+extern TianqishijuData g_tianqishiju_data;
+extern HsjzData g_hsjz_data;
+extern BrainTeaserData g_brain_teaser_data;
 
 // Function declarations
 void internet_menu_init(); // No longer takes TFT_eSPI& as argument, will use extern tft
@@ -109,5 +127,11 @@ void fetchShici();
 void fetchDuilian();
 void fetchFxRate();
 void fetchRandomEnWord();
+void fetchYiyan();
+void fetchLzmy();
+void fetchVerse();
+void fetchTianqishiju();
+void fetchHsjz();
+void fetchBrainTeaser();
 
 #endif // INTERNET_H
